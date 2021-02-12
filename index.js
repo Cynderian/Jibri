@@ -1,25 +1,103 @@
-require('dotenv').config();
+const fetch = require("node-fetch");
 const Discord = require('discord.js');
-const bot = new Discord.Client();
-const TOKEN = process.env.TOKEN;
+const {prefix, token} = require('./config.json');
+const client = new Discord.Client();
 
-bot.login(TOKEN);
-
-bot.on('ready', () => {
-  console.info(`Logged in as ${bot.user.tag}!`);
+client.on('ready', () => {
+  console.info(`Logged in as ${client.user.tag}`);
 });
 
-bot.on('message', msg => {
-  if (msg.content === 'ping') {
-    msg.reply('pong');
-    msg.channel.send('pong');
+client.on('message', message => {
+  if (!message.content.startsWith(prefix) || message.author.bot) return;
+  const args = message.content.slice(prefix.length).trim().split(/ +/);
+  const command = args.shift().toLowerCase();
 
-  } else if (msg.content.startsWith('!kick')) {
-    if (msg.mentions.users.size) {
-      const taggedUser = msg.mentions.users.first();
-      msg.channel.send(`You wanted to kick: ${taggedUser.username}`);
-    } else {
-      msg.reply('Please tag a valid user!');
+  if (command === 'lead') {
+    console.log('Working on lead...')
+    if (!args.length) {
+      return message.channel.send('Please define a reference system.')
+    } else if (args.length > 1) {
+      return message.channel.send('Error, too many arguments.')
     }
+
+    const name = args[0];
+    const url = 'https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&name=' + name;
+    async function getInf() {
+      let response = await fetch(url);
+      if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+      } else {
+          return await response.json();
+      }
+    }
+    getInf()
+    .then((data) => {
+      let inf = new Array();
+      let i = 0;
+      while(data.docs[0].factions[i]) {
+          inf.push(data.docs[0].factions[i].faction_details.faction_presence.influence);
+          i++;
+      }
+      const inf_sorted = inf.sort(function(a, b){return b - a});
+      inf_lead = ((inf[0] - inf[1]) * 100).toFixed(2);
+      message.channel.send('The system ' + name + " has an inf lead of " + inf_lead);
+    })
+    .catch(e => {
+      console.log('Error: ' + e.message);
+    });
+
+  } else if (command === 'sphere') {
+    console.log('Working on sphere...');
+      if (!args.length) {
+        return message.channel.send('Please define a reference system.')
+      } else if (args.length > 1) {
+        return message.channel.send('Error, too many arguments.')
+      }
+      message.channel.send("Processing...");
+
+      
+      async function findSphere() {
+        const name = args[0];
+        let page = 1;
+        let systems = [];
+        let governments_whole = [];
+        let lastResult = [];
+        const url = 'https://elitebgs.app/api/ebgs/v5/systems?sphere=true&referenceDistance=15&referenceSystem=' + name;
+        do {
+          try {
+            console.log('function page ' + page);
+            const response = await fetch(url + '&page=' + page);
+            const data = await response.json();
+            lastResult = data;
+            let i = 0;
+            while(data.docs[i]) {
+              console.log('data fill');
+              systems.push(data.docs[i].name);
+              governments_whole.push(data.docs[i].government);
+              i++;
+            }
+            page++;
+          } catch (err) {
+            console.error(`Error: ${err}`);
+          }
+        } while (lastResult.hasNextPage !== false);
+          let display = 'Sphere Analysis of ' + name + '\n\n';
+          let i, ideal_systems = 0;
+          let governments = {};
+          for (i = 1; i <= systems.length - 1; i++) {
+            governments[i] = governments_whole[i].slice(12, -1);
+            if (governments[i] === "corporate") {
+              ideal_systems++;
+            }
+            display = display + systems[i] + '\t' + governments[i] + '\n';
+          }
+
+          let total_systems = systems.length;
+          display = display + '\n' + ideal_systems + '/' + (total_systems - 1) + ' desired governments in place.';
+          message.channel.send(display);
+
+      }
+      findSphere();
   }
 });
+client.login(token);

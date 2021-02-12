@@ -1,15 +1,32 @@
 {
-  "name": "discord-bot",
+  "name": "Jibri",
   "version": "1.0.0",
-  "description": "Discord bot for SitePoint",
+  "description": "Michiel Mulders shows you how to install and set up a new Discord bot, which is made easier thanks to the API offered by the Discord.js package.",
   "main": "index.js",
+  "dependencies": {
+    "async-limiter": "^1.0.1",
+    "columnify": "^1.5.4",
+    "discord.js": "^11.6.4",
+    "dotenv": "^8.2.0",
+    "long": "^4.0.0",
+    "node-fetch": "^2.6.1",
+    "prism-media": "^0.0.3",
+    "snekfetch": "^3.6.4",
+    "tweetnacl": "^1.0.2",
+    "ws": "^6.2.1"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Michiel Mulders",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cynderian/Jibri.git"
+  },
+  "keywords": [],
+  "author": "",
   "license": "ISC",
-  "dependencies": {
-    "discord.js": "^11.5.1",
-    "dotenv": "^8.2.0"
-  }
+  "bugs": {
+    "url": "https://github.com/Cynderian/Jibri/issues"
+  },
+  "homepage": "https://github.com/Cynderian/Jibri#readme"
 }
