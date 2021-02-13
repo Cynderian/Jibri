@@ -17,13 +17,13 @@ async function getURL(url, name, page = 1) {
   return await response.json();
 }
 
-function infLead(data) {
+function infLead(data, sys = 0) {
   let inf = [];
   let i = 0;
   do {
-    inf.push(data.docs[0].factions[i].faction_details.faction_presence.influence);
+    inf.push(data.docs[sys].factions[i].faction_details.faction_presence.influence);
     i++;
-  } while (data.docs[0].factions[i]);
+  } while (data.docs[sys].factions[i]);
   inf = inf.sort(function(a, b){return b - a});
   return (((inf[0] - inf[1]) * 100).toFixed(2));
 }
@@ -73,7 +73,7 @@ client.on('message', message => {
         let ideal_systems = 0;
         let lastResult;
         let systemData = [];
-        const url = 'https://elitebgs.app/api/ebgs/v5/systems?sphere=true&referenceDistance=15&referenceSystem=' + input;
+        const url = 'https://elitebgs.app/api/ebgs/v5/systems?sphere=true&factionDetails=true&referenceDistance=15&referenceSystem=' + input;
         do {
           try {
             console.log('function page ' + page);
@@ -91,7 +91,7 @@ client.on('message', message => {
               let system = new Object();
               system.name = data_ebgs.docs[i].name;
               system.government = capitalize((data_ebgs.docs[i].government).slice(12, -1));
-              //system.lead = ;
+              system.lead = infLead(data_ebgs, i);
               system.gov_date = capitalize((data_ebgs.docs[i].updated_at).slice(5, 7) + '/' + (data_ebgs.docs[i].updated_at).slice(8, 10));
               if (data_eddb.docs[0].power != null) {// So null values do not go to capitalize
                 system.power = capitalize(data_eddb.docs[0].power);
@@ -119,7 +119,7 @@ client.on('message', message => {
         } while (lastResult != false);
 
         var columns = columnify(systemData);
-        message.channel.send('```ini\n' + '[' + input +  ' Control Sphere Analysis]\n\n' + columns + '\n```');
+        message.channel.send('```ini\n' + '[' + input +  ' Control Sphere Analysis]\n\n' + columns + '\n' + ideal_systems + '/' + total + ' favorable systems for Aisling expansion' + '\n```');
       }
       findSphere();
     }
