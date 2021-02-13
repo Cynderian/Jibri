@@ -66,9 +66,10 @@ client.on('message', message => {
         let systems = [];
         let governments_raw = [];
         let lastResult = [];
-        let last_updates_raw = [];
+        let last_update_elitebgs_raw = [];
         let power = [];
         let power_state = [];
+        let last_update_eddb_raw = [];
         const url = 'https://elitebgs.app/api/ebgs/v5/systems?sphere=true&referenceDistance=15&referenceSystem=' + name;
         do {
           try {
@@ -81,15 +82,14 @@ client.on('message', message => {
               console.log('data fill');
               systems.push(data.docs[i].name);
               governments_raw.push(data.docs[i].government);
-              last_updates_raw.push(data.docs[i].updated_at);
+              last_update_elitebgs_raw.push(data.docs[i].updated_at);
 
               console.log('eddbapi accessing');
               const eddb_response = await fetch('https://eddbapi.kodeblox.com/api/v4/populatedsystems?name=' + data.docs[i].name);
               const eddb_data = await eddb_response.json();
-              
               power.push(eddb_data.docs[0].power);
               power_state.push(eddb_data.docs[0].power_state);
-
+              last_update_eddb_raw.push(eddb_data.docs[0].updated_at);
               i++;
             } while(data.docs[i]);
             page++;
@@ -98,16 +98,21 @@ client.on('message', message => {
           }
         } while (lastResult.hasNextPage !== false);
 
-        let display = 'Sphere Analysis of ' + name + '\nSystem/Government/Last Updated/Power Presence\n\n';
+        let display = 'Sphere Analysis of ' + name + '\nSystem/Government/Last Updated/Power Presence/Last Updated\n\n';
         let i, ideal_systems = 0;
         for (i = 1; i <= systems.length - 1; i++) { // Skip control system
           let government = governments_raw[i].slice(12, -1);
-          let last_update = last_updates_raw[i].slice(5, 10);
+          let last_update_elitebgs = last_update_elitebgs_raw[i].slice(5, 10);
+          let last_update_eddb = last_update_eddb_raw[i].slice(5, 10);
           if (government === "corporate") {
             ideal_systems++;
           }
-          display = display + systems[i] + '\t' + capitalize(government) + '\t' + last_update
-           + '\t' + power[i] + '\t' + power_state[i] + '\n';
+          display = display + systems[i] + '\t' + capitalize(government) + '\t' + last_update_elitebgs + '\t';
+          if (power[i] !== null) {
+            display = display + power[i] + '\t' + power_state[i] + '\t' + last_update_eddb;
+          }
+          display = display + '\n';
+
         }
         let total_systems = systems.length;
         display = display + '\n' + ideal_systems + '/' + (total_systems - 1) + ' desired governments in place for expansion.';
