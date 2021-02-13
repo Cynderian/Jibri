@@ -12,19 +12,21 @@ function capitalize(str) {
   return words.join(' ');
 }
 
-async function infLead(input) {
+async function getURL(url, name, page = 1) {
+  const response = await fetch(url + name + '&page=' + page);
+  return await response.json();
+}
+
+function infLead(data) {
   let inf = [];
   let i = 0;
-  const url = 'https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&name=' + input;
-  const response = await fetch(url);
-  const data_ebgs = await response.json();
   do {
-    inf.push(data_ebgs.docs[0].factions[i].faction_details.faction_presence.influence);
+    inf.push(data.docs[0].factions[i].faction_details.faction_presence.influence);
     i++;
-  } while (data_ebgs.docs[0].factions[i]);
+  } while (data.docs[0].factions[i]);
   inf = inf.sort(function(a, b){return b - a});
-  return ((inf[0] - inf[1]) * 100).toFixed(2);
-  }
+  return (((inf[0] - inf[1]) * 100).toFixed(2));
+}
 
 
 client.on('ready', () => {
@@ -44,38 +46,16 @@ client.on('message', message => {
       return message.channel.send('Error, too many arguments.')
     }
     const input = capitalize(args[0]);
-    infLead(input)
+    getURL('https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&name=', input)
     .then((data) => {
-      message.channel.send('The system ' + input + " has an inf lead of " + data);
+      let x = infLead(data);
+      message.channel.send('The system ' + input + " has an inf lead of " + x);
     })
     .catch(e => {
       console.log('Error: ' + e.message);
     });
     
-    /*
-    async function fetchURL() {
-      let response = await fetch(url);
-      if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-      } else {
-          return await response.json();
-      }
-    }
-    fetchURL()
-    .then((data) => {
-      let inf = [];
-      let i = 0;
-      while(data.docs[0].factions[i]) {
-          inf.push(data.docs[0].factions[i].faction_details.faction_presence.influence);
-          i++;
-      }
-      const inf_sorted = inf.sort(function(a, b){return b - a});
-      inf_lead = ((inf[0] - inf[1]) * 100).toFixed(2);
-      message.channel.send('The system ' + input + " has an inf lead of " + inf_lead);
-    })
-    .catch(e => {
-      console.log('Error: ' + e.message);
-    });*/
+
   } else if (command === 'sphere') {
     console.log('Working on sphere...');
       if (!args.length) {
