@@ -67,10 +67,11 @@ client.on('message', message => {
         for (let i = 1; i < args.length; i++)
           input = input + ' ' + args[i];
       } else input = args[0];
-      console.log('input: ' + input);
-    input = capitalize(input);
+    console.log('input: ' + input);
+    
     
     async function findSphere() {
+      let ref_sys_flag = 0;
       let page = 1;
       let total = 0;
       let ideal_systems = 0;
@@ -95,6 +96,11 @@ client.on('message', message => {
               total = data_ebgs.total;
               const eddb_response = await fetch('https://eddbapi.kodeblox.com/api/v4/populatedsystems?name=' + data_ebgs.docs[i].name);
               const data_eddb = await eddb_response.json();
+
+              if (i == 0 && ref_sys_flag == 0) {
+                input = data_ebgs.docs[0].factions[0].faction_details.faction_presence.system_name;
+                ref_sys_flag++;
+              }
 
               let system = new Object();
               system.name = data_ebgs.docs[i].name;
