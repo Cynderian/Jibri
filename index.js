@@ -67,6 +67,8 @@ client.on('message', message => {
         let governments_raw = [];
         let lastResult = [];
         let last_updates_raw = [];
+        let power = [];
+        let power_state = [];
         const url = 'https://elitebgs.app/api/ebgs/v5/systems?sphere=true&referenceDistance=15&referenceSystem=' + name;
         do {
           try {
@@ -75,32 +77,41 @@ client.on('message', message => {
             const data = await response.json();
             lastResult = data;
             let i = 0;
-            while(data.docs[i]) {
+            do {
               console.log('data fill');
               systems.push(data.docs[i].name);
               governments_raw.push(data.docs[i].government);
               last_updates_raw.push(data.docs[i].updated_at);
+
+              console.log('eddbapi accessing');
+              const eddb_response = await fetch('https://eddbapi.kodeblox.com/api/v4/populatedsystems?name=' + data.docs[i].name);
+              const eddb_data = await eddb_response.json();
+              
+              power.push(eddb_data.docs[0].power);
+              power_state.push(eddb_data.docs[0].power_state);
+
               i++;
-            }
+            } while(data.docs[i]);
             page++;
           } catch (err) {
             console.error(`Error: ${err}`);
           }
         } while (lastResult.hasNextPage !== false);
-          let display = 'Sphere Analysis of ' + name + '\nSystem/Government/Last Updated\n\n';
-          let i, ideal_systems = 0;
-          for (i = 1; i <= systems.length - 1; i++) { // Skip control system
-            let government = governments_raw[i].slice(12, -1);
-            let last_update = last_updates_raw[i].slice(5, 10);
-            if (government === "corporate") {
-              ideal_systems++;
-            }
-            display = display + systems[i] + '\t' + capitalize(government) + '\t' + last_update + '\n';
-          }
 
-          let total_systems = systems.length;
-          display = display + '\n' + ideal_systems + '/' + (total_systems - 1) + ' desired governments in place for expansion.';
-          message.channel.send(display);
+        let display = 'Sphere Analysis of ' + name + '\nSystem/Government/Last Updated/Power Presence\n\n';
+        let i, ideal_systems = 0;
+        for (i = 1; i <= systems.length - 1; i++) { // Skip control system
+          let government = governments_raw[i].slice(12, -1);
+          let last_update = last_updates_raw[i].slice(5, 10);
+          if (government === "corporate") {
+            ideal_systems++;
+          }
+          display = display + systems[i] + '\t' + capitalize(government) + '\t' + last_update
+           + '\t' + power[i] + '\t' + power_state[i] + '\n';
+        }
+        let total_systems = systems.length;
+        display = display + '\n' + ideal_systems + '/' + (total_systems - 1) + ' desired governments in place for expansion.';
+        message.channel.send(display);
 
       }
       findSphere();
