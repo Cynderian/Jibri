@@ -3,6 +3,10 @@ const Discord = require('discord.js');
 const {prefix, token} = require('./config.json');
 const client = new Discord.Client();
 
+function capitalize(str) {
+  return (str.charAt(0).toUpperCase() + str.slice(1));
+}
+
 client.on('ready', () => {
   console.info(`Logged in as ${client.user.tag}`);
 });
@@ -20,9 +24,9 @@ client.on('message', message => {
       return message.channel.send('Error, too many arguments.')
     }
 
-    const name = args[0];
+    const name = capitalize(args[0]);
     const url = 'https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&name=' + name;
-    async function getInf() {
+    async function fetchURL() {
       let response = await fetch(url);
       if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -30,9 +34,9 @@ client.on('message', message => {
           return await response.json();
       }
     }
-    getInf()
+    fetchURL()
     .then((data) => {
-      let inf = new Array();
+      let inf = [];
       let i = 0;
       while(data.docs[0].factions[i]) {
           inf.push(data.docs[0].factions[i].faction_details.faction_presence.influence);
@@ -54,14 +58,15 @@ client.on('message', message => {
         return message.channel.send('Error, too many arguments.')
       }
       message.channel.send("Processing...");
-
       
       async function findSphere() {
-        const name = args[0];
+        
+        const name = capitalize(args[0]);
         let page = 1;
         let systems = [];
-        let governments_whole = [];
+        let governments_raw = [];
         let lastResult = [];
+        let last_updates_raw = [];
         const url = 'https://elitebgs.app/api/ebgs/v5/systems?sphere=true&referenceDistance=15&referenceSystem=' + name;
         do {
           try {
@@ -73,7 +78,8 @@ client.on('message', message => {
             while(data.docs[i]) {
               console.log('data fill');
               systems.push(data.docs[i].name);
-              governments_whole.push(data.docs[i].government);
+              governments_raw.push(data.docs[i].government);
+              last_updates_raw.push(data.docs[i].updated_at);
               i++;
             }
             page++;
@@ -81,19 +87,19 @@ client.on('message', message => {
             console.error(`Error: ${err}`);
           }
         } while (lastResult.hasNextPage !== false);
-          let display = 'Sphere Analysis of ' + name + '\n\n';
+          let display = 'Sphere Analysis of ' + name + '\nSystem/Government/Last Updated\n\n';
           let i, ideal_systems = 0;
-          let governments = {};
-          for (i = 1; i <= systems.length - 1; i++) {
-            governments[i] = governments_whole[i].slice(12, -1);
-            if (governments[i] === "corporate") {
+          for (i = 1; i <= systems.length - 1; i++) { // Skip control system
+            let government = governments_raw[i].slice(12, -1);
+            let last_update = last_updates_raw[i].slice(5, 10);
+            if (government === "corporate") {
               ideal_systems++;
             }
-            display = display + systems[i] + '\t' + governments[i] + '\n';
+            display = display + systems[i] + '\t' + capitalize(government) + '\t' + last_update + '\n';
           }
 
           let total_systems = systems.length;
-          display = display + '\n' + ideal_systems + '/' + (total_systems - 1) + ' desired governments in place.';
+          display = display + '\n' + ideal_systems + '/' + (total_systems - 1) + ' desired governments in place for expansion.';
           message.channel.send(display);
 
       }
