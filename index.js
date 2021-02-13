@@ -58,30 +58,38 @@ client.on('message', message => {
 
   } else if (command === 'sphere') {
     console.log('Working on sphere...');
-      if (!args.length) {
+    message.channel.send("Calculating...");
+    let input = '';
+      if (!args.length) { // take all input after sphere and designate it the target system
         return message.channel.send('Please define a reference system.')
       } else if (args.length > 1) {
-        return message.channel.send('Error, too many arguments.')
-      }
-      message.channel.send("Processing...");
-      
-      async function findSphere() {
-        
-        const input = capitalize(args[0]);
-        let page = 1;
-        let total = 0;
-        let ideal_systems = 0;
-        let lastResult;
-        let systemData = [];
+        input = args[0];
+        for (let i = 1; i < args.length; i++)
+          input = input + ' ' + args[i];
+      } else input = args[0];
+      console.log('input: ' + input);
+    input = capitalize(input);
+    
+    async function findSphere() {
+      let page = 1;
+      let total = 0;
+      let ideal_systems = 0;
+      let lastResult;
+      let systemData = [];
         const url = 'https://elitebgs.app/api/ebgs/v5/systems?sphere=true&factionDetails=true&referenceDistance=15&referenceSystem=' + input;
         do {
           try {
             console.log('function page ' + page);
             const response = await fetch(url + '&page=' + page);
             const data_ebgs = await response.json();
+            if (data_ebgs.total == 0) { //if system entered does not exist
+              message.channel.send('Something went wrong; was there a typo?');
+              console.log('command aborted');
+              return;
+            }
+
             lastResult = data_ebgs.hasNextPage;
             let i = 0;
-            let j = 0;
             do {
               console.log('data fill ' + i);
               total = data_ebgs.total;
@@ -102,7 +110,6 @@ client.on('message', message => {
               }
               system.pow_date = capitalize((data_eddb.docs[0].updated_at).slice(5, 7) + '/' + (data_eddb.docs[0].updated_at).slice(8, 10));
               systemData.push(system);
-
 
               if ((data_ebgs.docs[i].government).slice(12, -1) == "corporate")
                 ideal_systems++;// Find # of ideal systems
