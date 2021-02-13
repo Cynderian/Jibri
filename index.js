@@ -12,6 +12,21 @@ function capitalize(str) {
   return words.join(' ');
 }
 
+async function infLead(input) {
+  let inf = [];
+  let i = 0;
+  const url = 'https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&name=' + input;
+  const response = await fetch(url);
+  const data_ebgs = await response.json();
+  do {
+    inf.push(data_ebgs.docs[0].factions[i].faction_details.faction_presence.influence);
+    i++;
+  } while (data_ebgs.docs[0].factions[i]);
+  inf = inf.sort(function(a, b){return b - a});
+  return ((inf[0] - inf[1]) * 100).toFixed(2);
+  }
+
+
 client.on('ready', () => {
   console.info(`Logged in as ${client.user.tag}`);
 });
@@ -28,9 +43,16 @@ client.on('message', message => {
     } else if (args.length > 1) {
       return message.channel.send('Error, too many arguments.')
     }
-
     const input = capitalize(args[0]);
-    const url = 'https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&name=' + input;
+    infLead(input)
+    .then((data) => {
+      message.channel.send('The system ' + input + " has an inf lead of " + data);
+    })
+    .catch(e => {
+      console.log('Error: ' + e.message);
+    });
+    
+    /*
     async function fetchURL() {
       let response = await fetch(url);
       if (!response.ok) {
@@ -53,7 +75,7 @@ client.on('message', message => {
     })
     .catch(e => {
       console.log('Error: ' + e.message);
-    });
+    });*/
   } else if (command === 'sphere') {
     console.log('Working on sphere...');
       if (!args.length) {
@@ -69,7 +91,7 @@ client.on('message', message => {
         let page = 1;
         let total = 0;
         let ideal_systems = 0;
-        let lastResult = [];
+        let lastResult;
         let systemData = [];
         const url = 'https://elitebgs.app/api/ebgs/v5/systems?sphere=true&referenceDistance=15&referenceSystem=' + input;
         do {
@@ -77,7 +99,7 @@ client.on('message', message => {
             console.log('function page ' + page);
             const response = await fetch(url + '&page=' + page);
             const data_ebgs = await response.json();
-            lastResult = data_ebgs;
+            lastResult = data_ebgs.hasNextPage;
             let i = 0;
             let j = 0;
             do {
@@ -89,13 +111,18 @@ client.on('message', message => {
               let system = new Object();
               system.name = data_ebgs.docs[i].name;
               system.government = capitalize((data_ebgs.docs[i].government).slice(12, -1));
+              //system.lead = ;
               system.gov_date = capitalize((data_ebgs.docs[i].updated_at).slice(5, 7) + '/' + (data_ebgs.docs[i].updated_at).slice(8, 10));
-              if (data_eddb.docs[0].power != null) {
+              if (data_eddb.docs[0].power != null) {// So null values do not go to capitalize
                 system.power = capitalize(data_eddb.docs[0].power);
-              } else system.power = null;
-              system.state = capitalize(data_eddb.docs[0].power_state);
-              system.power_date = capitalize((data_eddb.docs[0].updated_at).slice(5, 7) + '/' + (data_eddb.docs[0].updated_at).slice(8, 10));
+                system.state = capitalize(data_eddb.docs[0].power_state);
+              } else {
+                system.power = null;
+                system.state = null;
+              }
+              system.pow_date = capitalize((data_eddb.docs[0].updated_at).slice(5, 7) + '/' + (data_eddb.docs[0].updated_at).slice(8, 10));
               systemData.push(system);
+
 
               for (j = 1; j <= total - 1; j++) { // Skip control system
                 if ((data_ebgs.docs[i].government).slice(12, -1) == "corporate") {
@@ -109,31 +136,12 @@ client.on('message', message => {
           } catch (err) {
             console.error(`Error: ${err}`);
           }
-        } while (lastResult.hasNextPage !== false);
+        } while (lastResult != false);
 
         var columns = columnify(systemData);
         message.channel.send('```ini\n' + '[' + input +  ' Control Sphere Analysis]\n\n' + columns + '\n```');
       }
       findSphere();
-  } else if (command === "column") {
-
-    var obj = [
-      {
-        system: "Venetet",
-        government: "Communist",
-        power: "Aisling"
-      },
-      {
-        system: "Sol",
-        government: "Democracy",
-        power: "Hudson"
-      }
-    ]
-
-    console.log(obj);
-    var columns = columnify(obj);
-    
-    message.channel.send('```\n' + columns + '\n```');
-  }
+    }
 });
 client.login(token);
