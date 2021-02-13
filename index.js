@@ -1,10 +1,15 @@
 const fetch = require("node-fetch");
+const columnify = require('columnify');
 const Discord = require('discord.js');
 const {prefix, token} = require('./config.json');
 const client = new Discord.Client();
 
 function capitalize(str) {
-  return (str.charAt(0).toUpperCase() + str.slice(1));
+  let words = str.split(' ');
+  for (let i = 0; i < words.length; i++) {
+    words[i] = words[i][0].toUpperCase() + words[i].substr(1);
+  }
+  return words.join(' ');
 }
 
 client.on('ready', () => {
@@ -24,8 +29,8 @@ client.on('message', message => {
       return message.channel.send('Error, too many arguments.')
     }
 
-    const name = capitalize(args[0]);
-    const url = 'https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&name=' + name;
+    const input = capitalize(args[0]);
+    const url = 'https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&name=' + input;
     async function fetchURL() {
       let response = await fetch(url);
       if (!response.ok) {
@@ -44,12 +49,11 @@ client.on('message', message => {
       }
       const inf_sorted = inf.sort(function(a, b){return b - a});
       inf_lead = ((inf[0] - inf[1]) * 100).toFixed(2);
-      message.channel.send('The system ' + name + " has an inf lead of " + inf_lead);
+      message.channel.send('The system ' + input + " has an inf lead of " + inf_lead);
     })
     .catch(e => {
       console.log('Error: ' + e.message);
     });
-
   } else if (command === 'sphere') {
     console.log('Working on sphere...');
       if (!args.length) {
@@ -61,65 +65,75 @@ client.on('message', message => {
       
       async function findSphere() {
         
-        const name = capitalize(args[0]);
+        const input = capitalize(args[0]);
         let page = 1;
-        let systems = [];
-        let governments_raw = [];
+        let total = 0;
+        let ideal_systems = 0;
         let lastResult = [];
-        let last_update_elitebgs_raw = [];
-        let power = [];
-        let power_state = [];
-        let last_update_eddb_raw = [];
-        const url = 'https://elitebgs.app/api/ebgs/v5/systems?sphere=true&referenceDistance=15&referenceSystem=' + name;
+        let systemData = [];
+        const url = 'https://elitebgs.app/api/ebgs/v5/systems?sphere=true&referenceDistance=15&referenceSystem=' + input;
         do {
           try {
             console.log('function page ' + page);
             const response = await fetch(url + '&page=' + page);
-            const data = await response.json();
-            lastResult = data;
+            const data_ebgs = await response.json();
+            lastResult = data_ebgs;
             let i = 0;
+            let j = 0;
             do {
-              console.log('data fill');
-              systems.push(data.docs[i].name);
-              governments_raw.push(data.docs[i].government);
-              last_update_elitebgs_raw.push(data.docs[i].updated_at);
+              console.log('data fill ' + i);
+              total = data_ebgs.total;
+              const eddb_response = await fetch('https://eddbapi.kodeblox.com/api/v4/populatedsystems?name=' + data_ebgs.docs[i].name);
+              const data_eddb = await eddb_response.json();
 
-              console.log('eddbapi accessing');
-              const eddb_response = await fetch('https://eddbapi.kodeblox.com/api/v4/populatedsystems?name=' + data.docs[i].name);
-              const eddb_data = await eddb_response.json();
-              power.push(eddb_data.docs[0].power);
-              power_state.push(eddb_data.docs[0].power_state);
-              last_update_eddb_raw.push(eddb_data.docs[0].updated_at);
+              let system = new Object();
+              system.name = data_ebgs.docs[i].name;
+              system.government = capitalize((data_ebgs.docs[i].government).slice(12, -1));
+              system.gov_date = capitalize((data_ebgs.docs[i].updated_at).slice(5, 7) + '/' + (data_ebgs.docs[i].updated_at).slice(8, 10));
+              if (data_eddb.docs[0].power != null) {
+                system.power = capitalize(data_eddb.docs[0].power);
+              } else system.power = null;
+              system.state = capitalize(data_eddb.docs[0].power_state);
+              system.power_date = capitalize((data_eddb.docs[0].updated_at).slice(5, 7) + '/' + (data_eddb.docs[0].updated_at).slice(8, 10));
+              systemData.push(system);
+
+              for (j = 1; j <= total - 1; j++) { // Skip control system
+                if ((data_ebgs.docs[i].government).slice(12, -1) == "corporate") {
+                  ideal_systems++;// Find # of ideal systems
+                }
+              }
+
               i++;
-            } while(data.docs[i]);
+            } while(data_ebgs.docs[i]);
             page++;
           } catch (err) {
             console.error(`Error: ${err}`);
           }
         } while (lastResult.hasNextPage !== false);
 
-        let display = 'Sphere Analysis of ' + name + '\nSystem/Government/Last Updated/Power Presence/Last Updated\n\n';
-        let i, ideal_systems = 0;
-        for (i = 1; i <= systems.length - 1; i++) { // Skip control system
-          let government = governments_raw[i].slice(12, -1);
-          let last_update_elitebgs = last_update_elitebgs_raw[i].slice(5, 10);
-          let last_update_eddb = last_update_eddb_raw[i].slice(5, 10);
-          if (government === "corporate") {
-            ideal_systems++;
-          }
-          display = display + systems[i] + '\t' + capitalize(government) + '\t' + last_update_elitebgs + '\t';
-          if (power[i] !== null) {
-            display = display + power[i] + '\t' + power_state[i] + '\t' + last_update_eddb;
-          }
-          display = display + '\n';
-
-        }
-        let total_systems = systems.length;
-        display = display + '\n' + ideal_systems + '/' + (total_systems - 1) + ' desired governments in place for expansion.';
-        message.channel.send(display);
-
+        var columns = columnify(systemData);
+        message.channel.send('```ini\n' + '[' + input +  ' Control Sphere Analysis]\n\n' + columns + '\n```');
       }
       findSphere();
+  } else if (command === "column") {
+
+    var obj = [
+      {
+        system: "Venetet",
+        government: "Communist",
+        power: "Aisling"
+      },
+      {
+        system: "Sol",
+        government: "Democracy",
+        power: "Hudson"
+      }
+    ]
+
+    console.log(obj);
+    var columns = columnify(obj);
+    
+    message.channel.send('```\n' + columns + '\n```');
   }
 });
 client.login(token);

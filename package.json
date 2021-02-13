@@ -6,7 +6,7 @@
   "dependencies": {
     "async-limiter": "^1.0.1",
     "columnify": "^1.5.4",
-    "discord.js": "^11.6.4",
+    "discord.js": "^12.5.1",
     "dotenv": "^8.2.0",
     "long": "^4.0.0",
     "node-fetch": "^2.6.1",
