@@ -104,11 +104,8 @@ client.on('message', message => {
               systemData.push(system);
 
 
-              for (j = 1; j <= total - 1; j++) { // Skip control system
-                if ((data_ebgs.docs[i].government).slice(12, -1) == "corporate") {
-                  ideal_systems++;// Find # of ideal systems
-                }
-              }
+              if ((data_ebgs.docs[i].government).slice(12, -1) == "corporate")
+                ideal_systems++;// Find # of ideal systems
 
               i++;
             } while(data_ebgs.docs[i]);
@@ -119,7 +116,8 @@ client.on('message', message => {
         } while (lastResult != false);
 
         var columns = columnify(systemData);
-        message.channel.send('```ini\n' + '[' + input +  ' Control Sphere Analysis]\n\n' + columns + '\n' + ideal_systems + '/' + total + ' favorable systems for Aisling expansion' + '\n```');
+        console.log("message sent");
+        message.channel.send('```ini\n[' + input +  ' Control Sphere Analysis]\n\n' + columns + '\n\n' + ideal_systems + '/' + (total - 1) + ' favorable systems for Aisling expansion' + '\n```');
       }
       findSphere();
     }
