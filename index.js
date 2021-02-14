@@ -28,6 +28,16 @@ function infLead(data, sys = 0) {
   return (((inf[0] - inf[1]) * 100).toFixed(2));
 }
 
+function popToCC (pop) { // CC given per system population
+  if (3200 > pop) {return 4;} else
+  if (30000 > pop) {return 5;} else
+  if (300000 > pop) {return 6;} else
+  if (3000000 > pop) {return 7;} else
+  if (30000000 > pop) {return 8;} else
+  if (300000000 > pop) {return 9;} else
+  if (3000000000 > pop) {return 10;} else
+  {return 11;}
+}
 
 client.on('ready', () => {
   console.info(`Logged in as ${client.user.tag}`);
@@ -77,6 +87,9 @@ client.on('message', message => {
       let ideal_systems = 0;
       let lastResult;
       let systemData = [];
+      let contestedData = [];
+      let sys_cc;
+      let free_cc = 0;
         const url = 'https://elitebgs.app/api/ebgs/v5/systems?sphere=true&factionDetails=true&referenceDistance=15&referenceSystem=' + input;
         do {
           try {
@@ -102,17 +115,27 @@ client.on('message', message => {
                 ref_sys_flag++;
               }
 
+              sys_cc = popToCC(data_ebgs.docs[i].population);
+
               let system = new Object();
+              let contested_sys = new Object();
               system.name = data_ebgs.docs[i].name;
               system.government = capitalize((data_ebgs.docs[i].government).slice(12, -1));
               system.lead = infLead(data_ebgs, i);
               system.gov_date = capitalize((data_ebgs.docs[i].updated_at).slice(5, 7) + '/' + (data_ebgs.docs[i].updated_at).slice(8, 10));
+              system.cc = sys_cc;
               if (data_eddb.docs[0].power != null) {// So null values do not go to capitalize
                 system.power = capitalize(data_eddb.docs[0].power);
                 system.state = capitalize(data_eddb.docs[0].power_state);
+                if (data_eddb.docs[0].power_state == 'exploited') {
+                  contested_sys.power = capitalize(data_eddb.docs[0].power);
+                  contested_sys.cc = sys_cc;
+                  contestedData.push(contested_sys);
+                }
               } else {
                 system.power = null;
                 system.state = null;
+                free_cc = free_cc + sys_cc;
               }
               system.pow_date = capitalize((data_eddb.docs[0].updated_at).slice(5, 7) + '/' + (data_eddb.docs[0].updated_at).slice(8, 10));
               systemData.push(system);
@@ -126,11 +149,43 @@ client.on('message', message => {
           } catch (err) {
             console.error(`Error: ${err}`);
           }
-        } while (lastResult != false);
+        } while (lastResult);
+
+        // convert contested CC values into readable strings
+        contestedData.sort(function(a, b) { // Sort by power alphabetically
+          var nameA = a.power;
+          var nameB = b.power;
+          if (nameA < nameB) {
+            return -1;
+          }
+          if (nameA > nameB) {
+            return 1;
+          }
+          return 0;
+        });
+        console.log(contestedData);
+        let power_name = contestedData[0].power;
+        let cc_contested_str = '\n';
+        let contested_cc = 0;
+        for(let i = 0; i < contestedData.length; i++) { // Add CC by power
+          if (power_name == contestedData[i].power) {
+            contested_cc = contested_cc + contestedData[i].cc;
+          } else {
+            cc_contested_str = cc_contested_str + contested_cc + 'CC is contested with ' + power_name + '\n';
+            power_name = contestedData[i].power;
+            contested_cc = 0;
+          }  
+        }
+        cc_contested_str = cc_contested_str + contested_cc + 'CC is contested with ' + power_name + '\n'; // Needed for last iteration
+
 
         var columns = columnify(systemData);
         console.log("message sent");
-        message.channel.send('```ini\n[' + input +  ' Control Sphere Analysis]\n\n' + columns + '\n\n' + ideal_systems + '/' + (total - 1) + ' favorable systems for Aisling expansion' + '\n```');
+        message.channel.send('```ini\n[' + input +  ' Control Sphere Analysis]\n\n' + columns + '\n```'); // tabularize info
+        message.channel.send('```\n' + ideal_systems + '/' + (total - 1) + ' favorable systems for Aisling expansion' // favorable systems footer
+        + '\n' + free_cc + 'CC gained by Aisling expansion' // CC gain footer
+        + cc_contested_str // CC contested footer
+        + '\n```');
       }
       findSphere();
     }

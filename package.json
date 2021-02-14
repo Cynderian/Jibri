@@ -1,7 +1,7 @@
 {
   "name": "Jibri",
   "version": "1.0.0",
-  "description": "Michiel Mulders shows you how to install and set up a new Discord bot, which is made easier thanks to the API offered by the Discord.js package.",
+  "description": "Multipurpose data-getter bot for Elite Dangerous",
   "main": "index.js",
   "dependencies": {
     "async-limiter": "^1.0.1",
