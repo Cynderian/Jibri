@@ -106,7 +106,6 @@ client.on('message', message => {
             let i = 0;
             do {
               console.log('data fill ' + i);
-              console.log(data_ebgs.docs[i].name);
               // Check for special systems, excluded from PP/BGS
               if (data_ebgs.docs[i].name != 'Shinrarta Dezhra' // you know where this is
               && data_ebgs.docs[i].name != 'Azoth' // 10 starter systems
@@ -149,14 +148,19 @@ client.on('message', message => {
                   }
                 } else {
                   system.power = null;
+                  if (data_eddb.docs[0].power_state == 'contested') {
+                    system.state = capitalize(data_eddb.docs[0].power_state);
+                    total--;
+                  } else {
                   system.state = null;
                   free_cc = free_cc + sys_cc;
+                  }
                 }
                 system.pow_date = capitalize((data_eddb.docs[0].updated_at).slice(5, 7) + '/' + (data_eddb.docs[0].updated_at).slice(8, 10));
                 systemData.push(system);
   
-                if ((data_ebgs.docs[i].government).slice(12, -1) == "corporate")
-                  ideal_systems++;// Find # of ideal systems
+                if ((data_ebgs.docs[i].government).slice(12, -1) == "corporate" && data_eddb.docs[0].power_state != 'contested')
+                  ideal_systems++; // Find # of ideal systems
   
               }
               i++;
