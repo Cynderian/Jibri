@@ -106,43 +106,59 @@ client.on('message', message => {
             let i = 0;
             do {
               console.log('data fill ' + i);
-              total = data_ebgs.total;
-              const eddb_response = await fetch('https://eddbapi.kodeblox.com/api/v4/populatedsystems?name=' + data_ebgs.docs[i].name);
-              const data_eddb = await eddb_response.json();
-
-              if (i == 0 && ref_sys_flag == 0) {
-                input = data_ebgs.docs[0].factions[0].faction_details.faction_presence.system_name;
-                ref_sys_flag++;
-              }
-
-              sys_cc = popToCC(data_ebgs.docs[i].population);
-
-              let system = new Object();
-              let contested_sys = new Object();
-              system.name = data_ebgs.docs[i].name;
-              system.government = capitalize((data_ebgs.docs[i].government).slice(12, -1));
-              system.lead = infLead(data_ebgs, i);
-              system.gov_date = capitalize((data_ebgs.docs[i].updated_at).slice(5, 7) + '/' + (data_ebgs.docs[i].updated_at).slice(8, 10));
-              system.cc = sys_cc;
-              if (data_eddb.docs[0].power != null) {// So null values do not go to capitalize
-                system.power = capitalize(data_eddb.docs[0].power);
-                system.state = capitalize(data_eddb.docs[0].power_state);
-                if (data_eddb.docs[0].power_state == 'exploited') {
-                  contested_sys.power = capitalize(data_eddb.docs[0].power);
-                  contested_sys.cc = sys_cc;
-                  contestedData.push(contested_sys);
+              console.log(data_ebgs.docs[i].name);
+              // Check for special systems, excluded from PP/BGS
+              if (data_ebgs.docs[i].name != 'Shinrarta Dezhra' // you know where this is
+              && data_ebgs.docs[i].name != 'Azoth' // 10 starter systems
+              && data_ebgs.docs[i].name != 'Dromi'
+              && data_ebgs.docs[i].name != 'Lia Fall'
+              && data_ebgs.docs[i].name != 'Matet'
+              && data_ebgs.docs[i].name != 'Orna'
+              && data_ebgs.docs[i].name != 'Otegine'
+              && data_ebgs.docs[i].name != 'Sharur'
+              && data_ebgs.docs[i].name != 'Tarnkappe'
+              && data_ebgs.docs[i].name != 'Tyet'
+              && data_ebgs.docs[i].name != 'Wolfsegen') {
+                
+                total++; // increment for every system that passes the filter
+                const eddb_response = await fetch('https://eddbapi.kodeblox.com/api/v4/populatedsystems?name=' + data_ebgs.docs[i].name);
+                const data_eddb = await eddb_response.json();
+  
+                
+                if (i == 0 && ref_sys_flag == 0) { // Store first system name for capitalization purposes
+                  input = data_ebgs.docs[0].factions[0].faction_details.faction_presence.system_name;
+                  ref_sys_flag++;
                 }
-              } else {
-                system.power = null;
-                system.state = null;
-                free_cc = free_cc + sys_cc;
+  
+                sys_cc = popToCC(data_ebgs.docs[i].population);
+  
+                let system = new Object();
+                let contested_sys = new Object();
+                system.name = data_ebgs.docs[i].name;
+                system.government = capitalize((data_ebgs.docs[i].government).slice(12, -1));
+                system.lead = infLead(data_ebgs, i);
+                system.gov_date = capitalize((data_ebgs.docs[i].updated_at).slice(5, 7) + '/' + (data_ebgs.docs[i].updated_at).slice(8, 10));
+                system.cc = sys_cc;
+                if (data_eddb.docs[0].power != null) {// So null values do not go to capitalize
+                  system.power = capitalize(data_eddb.docs[0].power);
+                  system.state = capitalize(data_eddb.docs[0].power_state);
+                  if (data_eddb.docs[0].power_state == 'exploited') { // If exploited system
+                    contested_sys.power = capitalize(data_eddb.docs[0].power);
+                    contested_sys.cc = sys_cc;
+                    contestedData.push(contested_sys);
+                  }
+                } else {
+                  system.power = null;
+                  system.state = null;
+                  free_cc = free_cc + sys_cc;
+                }
+                system.pow_date = capitalize((data_eddb.docs[0].updated_at).slice(5, 7) + '/' + (data_eddb.docs[0].updated_at).slice(8, 10));
+                systemData.push(system);
+  
+                if ((data_ebgs.docs[i].government).slice(12, -1) == "corporate")
+                  ideal_systems++;// Find # of ideal systems
+  
               }
-              system.pow_date = capitalize((data_eddb.docs[0].updated_at).slice(5, 7) + '/' + (data_eddb.docs[0].updated_at).slice(8, 10));
-              systemData.push(system);
-
-              if ((data_ebgs.docs[i].government).slice(12, -1) == "corporate")
-                ideal_systems++;// Find # of ideal systems
-
               i++;
             } while(data_ebgs.docs[i]);
             page++;
@@ -163,7 +179,6 @@ client.on('message', message => {
           }
           return 0;
         });
-        console.log(contestedData);
         let power_name = contestedData[0].power;
         let cc_contested_str = '\n';
         let contested_cc = 0;
