@@ -43,6 +43,7 @@ function popToCC(pop) { // CC given per system population
   if (pop < 3000000000) { return 10; }
   return 11;
 }
+
 async function findSphere(urlsys, message) {
   let refSysFlag = 0;
   let page = 1;
@@ -165,6 +166,7 @@ async function findSphere(urlsys, message) {
       contestedCCStr // CC contested footer
     }\n\`\`\``);
 }
+
 client.on('ready', () => {
   console.info(`Logged in as ${client.user.tag}`);
 });
@@ -203,6 +205,49 @@ client.on('message', (message) => {
     console.log(`input: ${input}`);
 
     findSphere(input, message);
+  } else if (command === 'sphere2') {
+    console.log('Working...');
+    message.channel.send('Calculating...');
+    let input = '';
+    if (!args.length) { // take all input after sphere and designate it the target system
+      return message.channel.send('Please define a reference system.');
+    } if (args.length > 1) {
+      input = args[0];
+      for (let i = 1; i < args.length; i++) { input = `${input} ${args[i]}`; }
+    } else input = args[0];
+    console.log(`input: ${input}`);
+
+    const ebgsPromises = [];
+    const eddbPromises = [];
+    fetch(`https://elitebgs.app/api/ebgs/v5/systems?sphere=true&factionDetails=true&referenceDistance=15&referenceSystem=${input}`)
+      .then((response) => response.json())
+      .then((json) => {
+        for (let i = 1; i < json.pages + 1; i++) { // page # starts at 1
+          ebgsPromises.push(fetch(`https://elitebgs.app/api/ebgs/v5/systems?sphere=true&factionDetails=true&referenceDistance=15&referenceSystem=${input}&page=${i}`));
+        }
+        Promise.all(ebgsPromises)
+          .then((responses) => Promise.all(responses.map((response) => response.json())))
+          .then((data) => {
+            let i = 0;
+            const systemData = [];
+            do { // Iterate through each page
+              let j = 0;
+              do { // Iterate through each system
+                const system = {};
+                console.log(data[i].docs[j].name);
+                system.name = data[i].docs[j].name;
+                systemData.push(system);
+                eddbPromises.push(fetch(`${data[i].docs[j].name}`));
+                j++;
+              } while (data[i].docs[j]);
+              i++;
+            } while (data[i]);
+          })
+          .catch((error) => {
+            console.log(error);
+          });
+      })
+      .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
   }
 });
 client.login(token);
