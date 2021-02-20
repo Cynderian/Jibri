@@ -1,3 +1,4 @@
+/* eslint-disable max-len */
 /* eslint-disable no-underscore-dangle */
 /* eslint-disable consistent-return */
 /* eslint-disable prefer-destructuring */
@@ -11,7 +12,10 @@ const columnify = require('columnify');
 const Discord = require('discord.js');
 const { prefix, token } = require('./config.json');
 
-const client = new Discord.Client();
+const lastTick = 0;
+const channel = '810285631460474940';
+
+const client = new Discord.Client(); // game start!
 
 function capitalize(str) {
   const words = str.split(' ');
@@ -21,8 +25,18 @@ function capitalize(str) {
   return words.join(' ');
 }
 
-async function getURL(url, name, page = 1) {
-  const response = await fetch(`${url + name}&page=${page}`);
+async function getURL(base, ...args) { // pass url and the ?/&
+  // pass name, then page
+  let url = base;
+  if (args.length !== 0) {
+    if (args.length <= 1) {
+      url += `&name=${args[0]}`;
+    }
+    if (args.length <= 2) {
+      url += `&page=${args[1]}`;
+    }
+  }
+  const response = await fetch(url);
   return response.json();
 }
 
@@ -49,24 +63,39 @@ function popToCC(pop) { // CC given per system population
 }
 
 client.on('ready', () => {
-  console.info(`Logged in as ${client.user.tag}`);
+  console.info('Logged in!');
   // mirror eddb file and remove the last blank line
-  exec('wget -N \'https://eddb.io/archive/v6/systems_populated.jsonl\' && truncate -s -1 systems_populated.jsonl', (error, stdout, stderr) => {
+  /* exec('wget -N \'https://eddb.io/archive/v6/systems_populated.jsonl\' && truncate -s -1 systems_populated.jsonl', (error, stdout, stderr) => {
     console.log(`stdout: ${stdout}`);
     console.log(`stderr: ${stderr}`);
     if (error !== null) {
       console.log(`exec error: ${error}`);
     }
-  }); // TODO: create alarm so this updates daily
+  }); */ // TODO: create alarm so this updates daily
+
+  // tick handling
+  if (channel.length > 0) { // check if channel is defined
+    // TODO: When permanent hosting aquired, daily tick option
+    /* lastTick = new Date();
+    setTimeout(() => {
+      getURL('https://elitebgs.app/api/ebgs/v5/ticks')
+        .then((data) => {
+          const newTick = new Date(data[0].time);
+          if (lastTick < newTick) {
+            client.channels.cache.get(channel).send('```ini\n[--------------------------]\n[-          TICK          -]\n[--------------------------]\n```');
+          }
+        })
+        .catch((err) => { console.log(`Error: ${err.message}`); });
+    }, 1000); */
+  }
 });
 
 client.on('message', (message) => {
   if (!message.content.startsWith(prefix) || message.author.bot) return;
   const args = message.content.slice(prefix.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
-
   if (command === 'lead') {
-    console.log('Working on lead...');
+    console.log(`${message.author} working on lead...`);
     if (!args.length) {
       return message.channel.send('Please define a reference system.');
     } if (args.length > 1) {
@@ -82,7 +111,7 @@ client.on('message', (message) => {
         console.log(`Error: ${e.message}`);
       });
   } else if (command === 'sphere') {
-    console.log('Working...');
+    console.log(`${message.author} working on sphere`);
     message.channel.send('Calculating...');
     let input = '';
     if (!args.length) { // take all input after sphere and designate it the target system
@@ -238,9 +267,24 @@ client.on('message', (message) => {
           })
           .catch((err) => { console.log(`Promise problem: ${err.message}`); });
       })
-      .catch((err) => {
-        console.log(`Fetch problem: ${err.message}`);
-      });
+      .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
+  } else if (command === 'tick') {
+    console.log(`${message.author} tick'd`);
+    getURL('https://elitebgs.app/api/ebgs/v5/ticks')
+      .then((data) => {
+        const tick = new Date(data[0].time);
+        const tickEmbed = new Discord.MessageEmbed()
+          .setColor('#0055b3')
+          .setTitle('Tick Detected')
+          .setURL('https://elitebgs.app/tick')
+          .setDescription(`**Latest tick was at**
+          ${tick.getUTCHours()}:${tick.getUTCMinutes()} UTC, ${tick.toString().slice(4, 7)} ${tick.getUTCDate()}`)
+          // .setThumbnail('https://i.imgur.com/wSTFkRM.png')
+          .setTimestamp();
+
+        message.channel.send(tickEmbed);
+      })
+      .catch((err) => { console.log(`Error: ${err.message}`); });
   }
 });
 client.login(token);
