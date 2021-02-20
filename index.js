@@ -12,8 +12,8 @@ const columnify = require('columnify');
 const Discord = require('discord.js');
 const { prefix, token } = require('./config.json');
 
-// const lastTick = 0;
 const channel = '810285631460474940'; // TODO: un-hardcode
+let newTick = '';
 
 const client = new Discord.Client(); // game start!
 
@@ -77,17 +77,17 @@ client.on('ready', () => {
   // tick handling
   if (channel.length > 0) { // check if channel is defined
     // TODO: When permanent hosting aquired, daily tick option
-    /* lastTick = new Date();
-    setTimeout(() => {
+    const lastTick = new Date();
+    setTimeout(() => { // TODO: fix so it grabs tick daily, not every startup
       getURL('https://elitebgs.app/api/ebgs/v5/ticks')
         .then((data) => {
-          const newTick = new Date(data[0].time);
+          newTick = new Date(data[0].time);
           if (lastTick < newTick) {
-            client.channels.cache.get(channel).send('```ini\n[--------------------------]\n[-          TICK          -]\n[--------------------------]\n```');
+          //  client.channels.cache.get(channel).send('```ini\n[--------------------------]\n[-          TICK          -]\n[--------------------------]\n```');
           }
         })
         .catch((err) => { console.log(`Error: ${err.message}`); });
-    }, 1000); */
+    }, 1000);
   }
 });
 
@@ -192,8 +192,14 @@ client.on('message', (message) => {
                 if (systemData[i] != null) {
                   if (obj.id === systemData[i].id) {
                     // Convert Unix time to UTC
-                    let lastUpdated = new Date(obj.updated_at * 1000).toISOString(); // set to UTC
-                    lastUpdated = `${lastUpdated.slice(5, 7)}/${lastUpdated.slice(8, 10)}`; // reformat
+                    let lastUpdated = new Date(obj.updated_at * 1000);
+                    let lastDay = lastUpdated.getDate();
+                    // lower date by 1 if update was before tick that day
+                    if (lastUpdated.getDate() === newTick.getDate()
+                    && lastUpdated.getTime() <= newTick.getTime()) { // TODO: replace if needed after tick update
+                      lastDay--;
+                    }
+                    lastUpdated = `${lastUpdated.getMonth() + 1}/${lastDay}`;
 
                     // Account for exploited systems
                     const exploitedSystem = {};
