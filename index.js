@@ -114,9 +114,6 @@ client.on('message', (message) => {
   } else if (command === 'sphere') {
     console.log(`${message.author.username}#${message.author.discriminator} working on sphere`);
     message.channel.send('Calculating...');
-    if (message.author.id === '96624685822775296') {
-      setTimeout(() => { message.channel.send('Just kidding. No data for you Mace Carbuncletire.'); }, 500);
-    }
     let input = '';
     if (!args.length) { // take all input after sphere and designate it the target system
       return message.channel.send('Please define a reference system.');
