@@ -50,13 +50,12 @@ function popToCC(pop) { // CC given per system population
 
 client.on('ready', () => {
   console.info(`Logged in as ${client.user.tag}`);
-  exec('wget -N https://eddb.io/archive/v6/systems_populated.jsonl', (error, stdout, stderr) => {
-    if (error) {
-      console.log(`error: ${error.message}`);
-      return;
-    }
-    if (stderr) {
-      console.log(`stderr: ${stderr}`);
+  // mirror eddb file and remove the last blank line
+  exec('wget -N \'https://eddb.io/archive/v6/systems_populated.jsonl\' && truncate -s -1 systems_populated.jsonl', (error, stdout, stderr) => {
+    console.log(`stdout: ${stdout}`);
+    console.log(`stderr: ${stderr}`);
+    if (error !== null) {
+      console.log(`exec error: ${error}`);
     }
   }); // TODO: create alarm so this updates daily
 });
