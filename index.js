@@ -164,23 +164,20 @@ client.on('message', (message) => {
                 && data[i].docs[j].name !== 'Wolfsegen') {
                   total++; // increment total trigger counting systems
                   if (i === 0 && j === 0) { // Store first system name for capitalization purposes
-                    // eslint-disable-next-line max-len
                     refSys = data[i].docs[j].factions[0].faction_details.faction_presence.system_name;
-                  } else { // skips reference system
-                    // console.log(`reading system ${i}:${j}`); // debug
-                    const system = {};
-                    system.name = data[i].docs[j].name;
-                    system.id = data[i].docs[j].eddb_id;
-                    systemData.push(system); // push object with names to array
-                    // assign these later to maintain order for columnify
-                    lead.push(infLead(data[i], j));
                   }
+                  // console.log(`reading system ${i}:${j}`); // debug
+                  const system = {};
+                  system.name = data[i].docs[j].name;
+                  system.id = data[i].docs[j].eddb_id;
+                  systemData.push(system); // push object with names to array
+                  // assign these later to maintain order for columnify
+                  lead.push(infLead(data[i], j));
                 }
                 j++; // increment system selection
               } while (data[i].docs[j]);
               i++;
             } while (data[i]);
-            total--; // reduce by 1 to account for the overincrement in the loop
             i = 0; // reset for readStream loop
             systemData.sort((a, b) => a.id - b.id); // sorts systems by ID lowest to highest
             console.log('reading local file');
@@ -203,17 +200,22 @@ client.on('message', (message) => {
 
                     // Account for exploited systems
                     const exploitedSystem = {};
-                    if (obj.power_state === 'Exploited') { // If exploited system
-                      exploitedSystem.power = obj.power;
-                      exploitedSystem.cc = popToCC(obj.population);
-                      exploitedData.push(exploitedSystem);
-                      total--; // to be contested systems will not count towards triggers
-                    } else if (obj.power_state === 'Contested' || obj.power_state === 'Control') {
-                      total--; // contested systems do not count towards triggers
-                    } else {
+                    if (obj.name === refSys) {
                       freeCC += popToCC(obj.population);
-                      if (obj.government === 'Corporate') {
-                        idealSystems++;
+                      total--;
+                    } else {
+                      if (obj.power_state === 'Exploited') { // If exploited system
+                        exploitedSystem.power = obj.power;
+                        exploitedSystem.cc = popToCC(obj.population);
+                        exploitedData.push(exploitedSystem);
+                        total--; // to be contested systems will not count towards triggers
+                      } else if (obj.power_state === 'Contested' || obj.power_state === 'Control') {
+                        total--; // contested systems do not count towards triggers
+                      } else {
+                        freeCC += popToCC(obj.population);
+                        if (obj.government === 'Corporate') {
+                          idealSystems++;
+                        }
                       }
                     }
 
