@@ -12,7 +12,7 @@ const columnify = require('columnify');
 const Discord = require('discord.js');
 const { prefix, token } = require('./config.json');
 
-const lastTick = 0;
+// const lastTick = 0;
 const channel = '810285631460474940';
 
 const client = new Discord.Client(); // game start!
@@ -95,7 +95,7 @@ client.on('message', (message) => {
   const args = message.content.slice(prefix.length).trim().split(/ +/);
   const command = args.shift().toLowerCase();
   if (command === 'lead') {
-    console.log(`${message.author} working on lead...`);
+    console.log(`${message.author.username}#${message.author.discriminator} working on lead...`);
     if (!args.length) {
       return message.channel.send('Please define a reference system.');
     } if (args.length > 1) {
@@ -111,8 +111,11 @@ client.on('message', (message) => {
         console.log(`Error: ${e.message}`);
       });
   } else if (command === 'sphere') {
-    console.log(`${message.author} working on sphere`);
+    console.log(`${message.author.username}#${message.author.discriminator} working on sphere`);
     message.channel.send('Calculating...');
+    if (message.author.id === '96624685822775296') {
+      setTimeout(() => { message.channel.send('Just kidding. No data for you Mace Carbuncletire.'); }, 500);
+    }
     let input = '';
     if (!args.length) { // take all input after sphere and designate it the target system
       return message.channel.send('Please define a reference system.');
@@ -269,7 +272,7 @@ client.on('message', (message) => {
       })
       .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
   } else if (command === 'tick') {
-    console.log(`${message.author} tick'd`);
+    console.log(`${message.author.username}#${message.author.discriminator} tick'd`);
     getURL('https://elitebgs.app/api/ebgs/v5/ticks')
       .then((data) => {
         const tick = new Date(data[0].time);
