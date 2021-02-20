@@ -13,7 +13,7 @@ const Discord = require('discord.js');
 const { prefix, token } = require('./config.json');
 
 // const lastTick = 0;
-const channel = '810285631460474940';
+const channel = '810285631460474940'; // TODO: un-hardcode
 
 const client = new Discord.Client(); // game start!
 
@@ -64,6 +64,7 @@ function popToCC(pop) { // CC given per system population
 
 client.on('ready', () => {
   console.info('Logged in!');
+  client.user.setActivity('All systems online');
   // mirror eddb file and remove the last blank line
   /* exec('wget -N \'https://eddb.io/archive/v6/systems_populated.jsonl\' && truncate -s -1 systems_populated.jsonl', (error, stdout, stderr) => {
     console.log(`stdout: ${stdout}`);
