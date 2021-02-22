@@ -5,10 +5,11 @@
 /* eslint-disable prefer-destructuring */
 /* eslint-disable no-console */
 /* eslint-disable no-plusplus */
+const request = require('request');
+const { exec } = require('child_process');
 const fetch = require('node-fetch');
 const fs = require('fs');
 const split = require('split');
-// const { exec } = require('child_process');
 const columnify = require('columnify');
 const Discord = require('discord.js');
 const { prefix, token } = require('./config.json');
@@ -100,13 +101,26 @@ client.on('ready', () => {
   console.info('Logged in!');
   client.user.setActivity('All systems online');
   // mirror eddb file and remove the last blank line
-  /* exec('wget -N 'https://eddb.io/archive/v6/systems_populated.jsonl' && truncate -s -1 systems_populated.jsonl', (error, stdout, stderr) => {
-    console.log(`stdout: ${stdout}`);
-    console.log(`stderr: ${stderr}`);
-    if (error !== null) {
-      console.log(`exec error: ${error}`);
-    }
-  }); */ // TODO: create alarm so this updates daily
+  const download = (url, path, callback) => {
+    request.head(url, () => {
+      request(url)
+        .pipe(fs.createWriteStream(path))
+        .on('close', callback);
+    });
+  };
+  const url = 'https://eddb.io/archive/v6/systems_populated.jsonl';
+  const path = 'systems_populated.jsonl';
+  download(url, path, () => {
+    exec('truncate -s -1 systems_populated.jsonl', (error, stdout, stderr) => {
+      console.log(`stdout: ${stdout}`);
+      console.log(`stderr: ${stderr}`);
+      if (error !== null) {
+        console.log(`exec error: ${error}`);
+      }
+    });
+    const now = new Date();
+    console.log(`EDDB mirrored at ${now}`);
+  });
 
   // tick handling
   if (channel.length > 0) { // check if channel is defined
@@ -302,7 +316,10 @@ client.on('message', (message) => {
                 console.log(err);
               });
           })
-          .catch((err) => { console.log(`Promise problem: ${err.message}`); });
+          .catch((err) => { 
+            console.log(`Promise problem: ${err.message}`);
+            message.channel.send('Something went wrong, likely eligebgs.app being difficult. Please try again, or if the problem persists, contact Cynder#7567');
+          });
       })
       .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
   } else if (command === 'tick') {
@@ -513,7 +530,7 @@ client.on('message', (message) => {
             // let idealSystems = 0;
             const sphereData = [];
             let systemData = [];
-            const exploitedData = [];
+            // const exploitedData = [];
             const overlapData = [];
             let sphereNumber = 0;
             const refSys = []; // reference systems
@@ -671,7 +688,7 @@ client.on('message', (message) => {
           })
           .catch((err) => {
             console.log(`Promise problem: ${err.message}`);
-            message.channel.send('Something went wrong. Please try again, or if the problem persists, contact Cynder#7567');
+            message.channel.send('Something went wrong, likely eligebgs.app being difficult. Please try again, or if the problem persists, contact Cynder#7567');
           });
       })
       .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
