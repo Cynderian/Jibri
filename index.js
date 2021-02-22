@@ -84,14 +84,11 @@ function infLead(data, sys = 0) {
 }
 
 function popToCC(pop) { // CC given per system population
-  if (pop < 3185) { return 4; }
-  if (pop < 31850) { return 5; }
-  if (pop < 318500) { return 6; }
-  if (pop < 3185000) { return 7; }
-  if (pop < 31850000) { return 8; }
-  if (pop < 318500000) { return 9; }
-  if (pop < 3185000000) { return 10; }
-  return 11;
+  const CC = 1 + Math.round(Math.log10(pop));
+  if (CC >= 11) {
+    return 11;
+  }
+  return CC;
 }
 
 function lastUpdated(eddbData) {
@@ -306,7 +303,7 @@ client.on('message', (message) => {
                       exploitedCC = exploitedData[i].cc;
                     }
                   }
-                  exploitedCCStr = `${exploitedCCStr + exploitedCC}CC will be contested with ${powerName}\n`; // Needed for last iteration
+                  exploitedCCStr = `${exploitedCCStr + exploitedCC} CC will be contested with ${powerName}\n`; // Needed for last iteration
                 }
                 const columns = columnify(systemData); // tabularize info
                 message.channel.send(`\`\`\`ini\n[${refSys} Control Sphere Analysis]\n\n${columns}\n\`\`\``);
