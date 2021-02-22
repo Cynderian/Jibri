@@ -14,7 +14,6 @@ const columnify = require('columnify');
 const Discord = require('discord.js');
 const { prefix, token } = require('./config.json');
 
-const channel = '810285631460474940'; // TODO: un-hardcode
 let newTick = '';
 
 const client = new Discord.Client(); // game start!
@@ -124,20 +123,14 @@ client.on('ready', () => {
   mirrorEddb();
 
   // tick handling
-  if (channel.length > 0) { // check if channel is defined
-    // TODO: When permanent hosting aquired, daily tick option
-    const lastTick = new Date();
-    setTimeout(() => { // TODO: fix so it grabs tick daily, not every startup
-      getURL('https://elitebgs.app/api/ebgs/v5/ticks')
-        .then((data) => {
-          newTick = new Date(data[0].time);
-          if (lastTick < newTick) {
-          //  client.channels.cache.get(channel).send('```ini\n[--------------------------]\n[-          TICK          -]\n[--------------------------]\n```');
-          }
-        })
-        .catch((err) => { console.log(`Error: ${err.message}`); });
-    }, 1000);
-  }
+  setInterval(() => { // grabs tick every minute
+    getURL('https://elitebgs.app/api/ebgs/v5/ticks')
+      .then((data) => {
+        newTick = new Date(data[0].time);
+        console.log('tick get');
+      })
+      .catch((err) => { console.log(`Error: ${err.message}`); });
+  }, 60000);
 });
 
 client.on('message', (message) => {
@@ -236,8 +229,6 @@ client.on('message', (message) => {
             fs.createReadStream('./systems_populated.jsonl')
               .pipe(split(JSON.parse))
               .on('data', (obj) => { // this iterates through every system
-                // TODO: find a way around manually removing the final space on systems_population,
-                // so theres not an unexpected json file end
                 if (systemData[i] != null) {
                   if (obj.id === systemData[i].id) {
                     // Account for exploited systems
@@ -584,8 +575,6 @@ client.on('message', (message) => {
             fs.createReadStream('./systems_populated.jsonl')
               .pipe(split(JSON.parse))
               .on('data', (obj) => { // this iterates through every system
-                // TODO: find a way around manually removing the final space on systems_population,
-                // so theres not an unexpected json file end
                 let overlapIndicator = 0;
                 let lastLead;
                 for (i = 0; i < sphereData.length; i++) { // iterate through spheres
@@ -705,7 +694,9 @@ client.on('message', (message) => {
     ~sphere <system> designated a system as a control system, and grabs data for all populated systems within a 15ly sphere
     ~scout <faction> shows the inf leads of all systems controlled by that faction
     ~tick shows the last tick time
-    ~multisphere <system 1> <system 2> ... <system i> shows all systems overlapped by the 15ly spheres of the input systems.\n\`\`\``);
+    ~multisphere <system 1> <system 2> ... <system i> shows all systems overlapped by the 15ly spheres of the input systems.
+    
+    The dates shown reflect when the leads were last updated; the Powerplay info is updated daily at 1am CST, via EDDB\n\`\`\``);
   }
 });
 client.login(token);
