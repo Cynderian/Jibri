@@ -19,6 +19,29 @@ let newTick = '';
 
 const client = new Discord.Client(); // game start!
 
+function mirrorEddb() {
+  const download = (url, path, callback) => {
+    request.head(url, () => {
+      request(url)
+        .pipe(fs.createWriteStream(path))
+        .on('close', callback);
+    });
+  };
+  const url = 'https://eddb.io/archive/v6/systems_populated.jsonl';
+  const path = 'systems_populated.jsonl';
+  download(url, path, () => {
+    exec('truncate -s -1 systems_populated.jsonl', (error, stdout, stderr) => {
+      console.log(`stdout: ${stdout}`);
+      console.log(`stderr: ${stderr}`);
+      if (error !== null) {
+        console.log(`exec error: ${error}`);
+      }
+    });
+    const now = new Date();
+    console.log(`EDDB mirrored at ${now}`);
+  });
+}
+
 /* function capitalize(str) {
   const words = str.split(' ');
   for (let i = 0; i < words.length; i++) {
@@ -61,13 +84,13 @@ function infLead(data, sys = 0) {
 }
 
 function popToCC(pop) { // CC given per system population
-  if (pop < 3200) { return 4; }
-  if (pop < 30000) { return 5; }
-  if (pop < 300000) { return 6; }
-  if (pop < 3000000) { return 7; }
-  if (pop < 30000000) { return 8; }
-  if (pop < 300000000) { return 9; }
-  if (pop < 3000000000) { return 10; }
+  if (pop < 3185) { return 4; }
+  if (pop < 31850) { return 5; }
+  if (pop < 318500) { return 6; }
+  if (pop < 3185000) { return 7; }
+  if (pop < 31850000) { return 8; }
+  if (pop < 318500000) { return 9; }
+  if (pop < 3185000000) { return 10; }
   return 11;
 }
 
@@ -101,26 +124,7 @@ client.on('ready', () => {
   console.info('Logged in!');
   client.user.setActivity('All systems online');
   // mirror eddb file and remove the last blank line
-  const download = (url, path, callback) => {
-    request.head(url, () => {
-      request(url)
-        .pipe(fs.createWriteStream(path))
-        .on('close', callback);
-    });
-  };
-  const url = 'https://eddb.io/archive/v6/systems_populated.jsonl';
-  const path = 'systems_populated.jsonl';
-  download(url, path, () => {
-    exec('truncate -s -1 systems_populated.jsonl', (error, stdout, stderr) => {
-      console.log(`stdout: ${stdout}`);
-      console.log(`stderr: ${stderr}`);
-      if (error !== null) {
-        console.log(`exec error: ${error}`);
-      }
-    });
-    const now = new Date();
-    console.log(`EDDB mirrored at ${now}`);
-  });
+  //mirrorEddb();
 
   // tick handling
   if (channel.length > 0) { // check if channel is defined
@@ -316,7 +320,7 @@ client.on('message', (message) => {
                 console.log(err);
               });
           })
-          .catch((err) => { 
+          .catch((err) => {
             console.log(`Promise problem: ${err.message}`);
             message.channel.send('Something went wrong, likely eligebgs.app being difficult. Please try again, or if the problem persists, contact Cynder#7567');
           });
@@ -528,6 +532,7 @@ client.on('message', (message) => {
             // const totalSys = [];
             // let freeCC = 0;
             // let idealSystems = 0;
+            let overlapTotalCC = 0;
             const sphereData = [];
             let systemData = [];
             // const exploitedData = [];
@@ -634,6 +639,7 @@ client.on('message', (message) => {
                   overlapSystem.state = obj.power_state;
                   overlapSystem.date = lastUpdated(obj);
                   overlapData.push(overlapSystem);
+                  overlapTotalCC += popToCC(obj.population);
                 }
               })
               .on('close', () => { // acting as .then for createReadStream
@@ -680,6 +686,7 @@ client.on('message', (message) => {
                 refSysStr = refSysStr.slice(0, -2);
                 const overlapColumns = columnify(overlapData); // tabularize info
                 message.channel.send(`\`\`\`ini\n[${refSysStr} Sphere Overlap Analysis]\n\n${overlapColumns}\n\`\`\``);
+                message.channel.send(`\`\`\`${overlapTotalCC} CC inside the overlap\n\`\`\``);
                 console.log('command done');
               })
               .on('error', (err) => {
@@ -692,6 +699,16 @@ client.on('message', (message) => {
           });
       })
       .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
+  } else if (command === 'help') {
+    message.channel.send(`\`\`\`Current Version: 0.5.2
+    All data is as up-to-date as possible (via eddb), bot can receive dms. Dates shown are roughly auto-corrected to tick timings.
+    
+    Commands:
+    ~lead <system> takes a system and finds the inf% difference between the highest inf% faction, and the 2nd highest
+    ~sphere <system> designated a system as a control system, and grabs data for all populated systems within a 15ly sphere
+    ~scout <faction> shows the inf leads of all systems controlled by that faction
+    ~tick shows the last tick time
+    ~multisphere <system 1> <system 2> ... <system i> shows all systems overlapped by the 15ly spheres of the input systems.\n\`\`\``);
   }
 });
 client.login(token);
