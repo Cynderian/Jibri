@@ -124,7 +124,7 @@ client.on('ready', () => {
   console.info('Logged in!');
   client.user.setActivity('All systems online');
   // mirror eddb file and remove the last blank line
-  //mirrorEddb();
+  // mirrorEddb();
 
   // tick handling
   if (channel.length > 0) { // check if channel is defined
@@ -174,7 +174,7 @@ client.on('message', (message) => {
       return message.channel.send('Please define a reference system.');
     }
     if (args.length > 1) {
-      input = args[1]; // start at 1 to avoid an extra ' ' from for loop
+      input = args[0]; // start at first argument to avoid an extra ' ' from for loop
       for (let i = 1; i < args.length; i++) { input = `${input} ${args[i]}`; }
     } else input = args[0];
     // if systems are seperated with "", remove them for processing
@@ -700,7 +700,7 @@ client.on('message', (message) => {
       })
       .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
   } else if (command === 'help') {
-    message.channel.send(`\`\`\`Current Version: 0.5.2
+    message.channel.send(`\`\`\`Current Version: 0.5.4
     All data is as up-to-date as possible (via eddb), bot can receive dms. Dates shown are roughly auto-corrected to tick timings.
     
     Commands:
