@@ -8,11 +8,13 @@
     "columnify": "^1.5.4",
     "discord.js": "^12.5.1",
     "dotenv": "^8.2.0",
+    "express": "^4.17.1",
     "long": "^4.0.0",
     "node-fetch": "^2.6.1",
     "prism-media": "^0.0.3",
     "request": "^2.88.2",
     "snekfetch": "^3.6.4",
+    "socket.io-client": "^3.1.1",
     "split": "^1.0.1",
     "tweetnacl": "^1.0.2",
     "ws": "^6.2.1"
