@@ -661,7 +661,6 @@ client.on('message', (message) => {
                   refSysStr += `${refSys[i]}, `;
                 }
                 refSysStr = refSysStr.slice(0, -2);
-                console.log(overlapData);
                 const overlapColumns = columnify(overlapData); // tabularize info
                 message.channel.send(`\`\`\`ini\n[${refSysStr} Sphere Overlap Analysis]\n\n${overlapColumns}\n\`\`\``);
                 console.log('command done');
