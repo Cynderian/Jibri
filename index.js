@@ -5,6 +5,9 @@
 /* eslint-disable prefer-destructuring */
 /* eslint-disable no-console */
 /* eslint-disable no-plusplus */
+// eslint-disable-next-line no-unused-vars
+const express = require('express');
+const io = require('socket.io-client');
 const request = require('request');
 const { exec } = require('child_process');
 const fetch = require('node-fetch');
@@ -15,7 +18,7 @@ const Discord = require('discord.js');
 const { prefix, token } = require('./config.json');
 
 let newTick = '';
-
+const socket = io('http://tick.phelbore.com:31173');
 const client = new Discord.Client(); // game start!
 
 function mirrorEddb() {
@@ -123,13 +126,13 @@ client.on('ready', () => {
   mirrorEddb();
 
   // tick handling
+
+  let tick;
+  socket.on('tick', (data) => console.log(`new tick at ${data}`));
+  socket.on('message', (data) => { console.log(data); tick = data; });
+
   setInterval(() => { // grabs tick every minute
-    getURL('https://elitebgs.app/api/ebgs/v5/ticks')
-      .then((data) => {
-        newTick = new Date(data[0].time);
-        console.log('tick get');
-      })
-      .catch((err) => { console.log(`Error: ${err.message}`); });
+    newTick = tick;
   }, 60000);
 });
 
