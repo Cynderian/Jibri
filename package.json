@@ -1,6 +1,6 @@
 {
   "name": "Jibri",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "description": "Multipurpose data-getter bot for Elite Dangerous",
   "main": "index.js",
   "dependencies": {
