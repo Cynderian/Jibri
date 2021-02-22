@@ -124,7 +124,7 @@ client.on('ready', () => {
   console.info('Logged in!');
   client.user.setActivity('All systems online');
   // mirror eddb file and remove the last blank line
-  // mirrorEddb();
+  mirrorEddb();
 
   // tick handling
   if (channel.length > 0) { // check if channel is defined
