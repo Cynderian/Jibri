@@ -6,8 +6,6 @@
 /* eslint-disable no-console */
 /* eslint-disable no-plusplus */
 // eslint-disable-next-line no-unused-vars
-const express = require('express');
-const io = require('socket.io-client');
 const request = require('request');
 const { exec } = require('child_process');
 const fetch = require('node-fetch');
@@ -18,7 +16,6 @@ const Discord = require('discord.js');
 const { prefix, token } = require('./config.json');
 
 let newTick = '';
-const socket = io('http://tick.phelbore.com:31173');
 const client = new Discord.Client(); // game start!
 
 function mirrorEddb() {
@@ -123,16 +120,23 @@ client.on('ready', () => {
   console.info('Logged in!');
   client.user.setActivity('All systems online');
   // mirror eddb file and remove the last blank line
-  mirrorEddb();
+  // mirrorEddb();
 
   // tick handling
-
-  let tick;
-  socket.on('tick', (data) => console.log(`new tick at ${data}`));
-  socket.on('message', (data) => { console.log(data); tick = data; });
-
-  setInterval(() => { // grabs tick every minute
-    newTick = tick;
+  let oldTick = 0;
+  setInterval(() => {
+    getURL('https://elitebgs.app/api/ebgs/v5/ticks')
+      .then((tickData) => {
+        if (oldTick === 0) {
+          console.log('initial tick get!');
+        }
+        if (tickData[0].time !== oldTick) {
+          console.log(`New tick detected! ${tickData[0].time}`);
+        }
+        oldTick = tickData[0].time;
+        newTick = new Date(tickData[0].time);
+      })
+      .catch((err) => console.log(`Tick get failed, ${err}`));
   }, 60000);
 });
 
@@ -142,7 +146,7 @@ client.on('message', (message) => {
   const command = args.shift().toLowerCase();
 
   if (command === 'lead') {
-    console.log(`${message.author.username}#${message.author.discriminator} working on lead...`);
+    console.log('working on lead...');
     let input = '';
     if (!args.length) { // take all input after sphere and designate it the target system
       return message.channel.send('Please define a reference system.');
@@ -160,7 +164,7 @@ client.on('message', (message) => {
         console.log(`Error: ${e.message}`);
       });
   } else if (command === 'sphere') {
-    console.log(`${message.author.username}#${message.author.discriminator} working on sphere`);
+    console.log('working on sphere');
     message.channel.send('Calculating...');
     let input = '';
     if (!args.length) { // take all input after sphere and designate it the target system
@@ -215,7 +219,6 @@ client.on('message', (message) => {
                   if (i === 0 && j === 0) { // Store first system name for capitalization purposes
                     refSys = data[i].docs[j].factions[0].faction_details.faction_presence.system_name;
                   }
-                  // console.log(`reading system ${i}:${j}`); // debug
                   const system = {};
                   system.name = data[i].docs[j].name;
                   system.id = data[i].docs[j].eddb_id;
@@ -318,7 +321,7 @@ client.on('message', (message) => {
       })
       .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
   } else if (command === 'tick') {
-    console.log(`${message.author.username}#${message.author.discriminator} tick'd`);
+    console.log('tick\'d');
     getURL('https://elitebgs.app/api/ebgs/v5/ticks')
       .then((data) => {
         const tick = new Date(data[0].time);
@@ -335,7 +338,7 @@ client.on('message', (message) => {
       })
       .catch((err) => { console.log(`Error: ${err.message}`); });
   } else if (command === 'scout') {
-    console.log(`${message.author.username}#${message.author.discriminator} working on scout`);
+    console.log('working on scout');
     message.channel.send('Calculating...');
     let input = '';
     if (!args.length) { // take all input after sphere and designate it the target faction
@@ -458,7 +461,7 @@ client.on('message', (message) => {
       })
       .catch((err) => { console.log(`Error: ${err.message}`); });
   } else if (command === 'multisphere') {
-    console.log(`${message.author.username}#${message.author.discriminator} working on multisphere`);
+    console.log('working on multisphere');
     message.channel.send('Calculating... This may take some time!');
     let input = '';
     const inputs = [];
@@ -689,7 +692,7 @@ client.on('message', (message) => {
       })
       .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
   } else if (command === 'help') {
-    message.channel.send(`\`\`\`Current Version: 0.5.4
+    message.channel.send(`\`\`\`Current Version: 0.5.7
     All data is as up-to-date as possible (via eddb), bot can receive dms. Dates shown are roughly auto-corrected to tick timings.
     
     Commands:
