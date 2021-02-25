@@ -734,7 +734,12 @@ client.on('message', (message) => {
           if (obj.power === power && obj.power_state === 'Control') {
             cc += popToCC(obj.population);
             unique++;
-            controlSystems.push(obj.name);
+            const controlSystem = {};
+            controlSystem.name = obj.name;
+            controlSystem.x = obj.x;
+            controlSystem.y = obj.y;
+            controlSystem.z = obj.z;
+            controlSystems.push(controlSystem);
           }
         }
       })
@@ -744,12 +749,22 @@ client.on('message', (message) => {
         fs.createReadStream('./systems_populated.jsonl')
           .pipe(split(JSON.parse))
           .on('data', (sys) => { // this iterates through every system
-            for (let i = 0; i < controlSystems.length; i++) {
-              for (let j = 0; j < countedSystems.length; j++) {
-                if (distLessThan(15, controlSystems[i].x, controlSystems[i].y, controlSystems[i].z, sys.x, sys.y, sys.z) === true && sys.power_state === 'Exploited' && sys.name !== countedSystems[j]) { // if system is within sphere of control system
-                  countedSystems.push(sys.name);
-                  cc += popToCC(sys.population);
-                  unique++;
+            if (sys.population > 0) {
+              for (let i = 0; i < controlSystems.length; i++) {
+                if (distLessThan(15, controlSystems[i].x, controlSystems[i].y, controlSystems[i].z, sys.x, sys.y, sys.z) === true && sys.power_state !== 'Contested' && sys.power_state !== 'Control') { // if system is within sphere of control system
+                  console.log(`Ref: ${controlSystems[i].name}`);
+                  let counted = 0;
+                  for (let j = 0; j < countedSystems.length; j++) {
+                    if (sys.name === countedSystems[j]) {
+                      counted++;
+                    }
+                  }
+                  if (counted === 0) {
+                    cc += popToCC(sys.population);
+                    countedSystems.push(sys.name);
+                    unique++;
+                    console.log(`${sys.name}, ${sys.power_state}, ${popToCC(sys.population)} CC`);
+                  }
                 }
               }
             }
@@ -776,6 +791,7 @@ client.on('message', (message) => {
     ~scout <faction> shows the inf leads of all systems controlled by that faction
     ~tick shows the last tick time
     ~multisphere <system 1> <system 2> ... <system i> shows all systems overlapped by the 15ly spheres of the input systems.
+    ~cc <power> shows the total cc and systems controlled by a power
     
     The dates shown reflect when the leads were last updated; the Powerplay info is updated daily at 1am CST, via EDDB\n\`\`\``);
   }
