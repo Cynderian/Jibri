@@ -30,8 +30,8 @@ function mirrorEddb() {
   const path = 'systems_populated.jsonl';
   download(url, path, () => {
     exec('truncate -s -1 systems_populated.jsonl', (error, stdout, stderr) => {
-      console.log(`stdout: ${stdout}`);
-      console.log(`stderr: ${stderr}`);
+      console.log(stdout);
+      console.log(stderr);
       if (error !== null) {
         console.log(`exec error: ${error}`);
       }
@@ -54,6 +54,18 @@ function removeQuotes(input) {
     return input.slice(1, -1);
   }
   return input;
+}
+
+function distLessThan(dist, x1, y1, z1, x2, y2, z2) { // length of a vector
+  const a = x2 - x1;
+  const b = y2 - y1;
+  const c = z2 - z1;
+  const length = Math.sqrt((a * a) + (b * b) + (c * c));
+
+  if (length <= dist) {
+    return true;
+  }
+  return false;
 }
 
 async function getURL(base, ...args) { // pass url and the ?/&
@@ -120,20 +132,19 @@ client.on('ready', () => {
   console.info('Logged in!');
   client.user.setActivity('All systems online');
   // mirror eddb file and remove the last blank line
-  // mirrorEddb();
+  mirrorEddb();
 
   // tick handling
-  let oldTick = 0;
-  setInterval(() => {
+  getURL('https://elitebgs.app/api/ebgs/v5/ticks')
+    .then((tickData) => {
+      console.log('initial tick get!');
+      newTick = new Date(tickData[0].time);
+    })
+    .catch((err) => console.log(`Tick get failed, ${err}`));
+
+  setInterval(() => { // grab tick every minute
     getURL('https://elitebgs.app/api/ebgs/v5/ticks')
       .then((tickData) => {
-        if (oldTick === 0) {
-          console.log('initial tick get!');
-        }
-        if (tickData[0].time !== oldTick) {
-          console.log(`New tick detected! ${tickData[0].time}`);
-        }
-        oldTick = tickData[0].time;
         newTick = new Date(tickData[0].time);
       })
       .catch((err) => console.log(`Tick get failed, ${err}`));
@@ -155,6 +166,7 @@ client.on('message', (message) => {
       for (let i = 1; i < args.length; i++) { input = `${input} ${args[i]}`; }
     } else input = args[0];
     input = removeQuotes(input);
+
     getURL('https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&name=', input)
       .then((data) => {
         const lead = infLead(data);
@@ -691,8 +703,71 @@ client.on('message', (message) => {
           });
       })
       .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
+  } else if (command === 'cc') {
+    console.log('working on cc');
+    message.channel.send('Calculating...');
+    let input = '';
+    if (!args.length) { // take all input after cc and designate it the target power
+      return message.channel.send('Please define a reference power.');
+    }
+    if (args.length > 1) {
+      input = args[0]; // start at first argument to avoid an extra ' ' from for loop
+      for (let i = 1; i < args.length; i++) { input = `${input} ${args[i]}`; }
+    } else input = args[0];
+    // if input is seperated with "", remove them for processing
+    input = removeQuotes(input);
+
+    const controlSystems = [];
+    let cc = 0;
+    let unique = 0;
+    let capitalizationFlag = 0;
+    let power = '';
+    // grab all control systems for the power
+    fs.createReadStream('./systems_populated.jsonl')
+      .pipe(split(JSON.parse))
+      .on('data', (obj) => { // this iterates through every system
+        if (obj.power !== null) {
+          if ((obj.power).toLowerCase() === input.toLowerCase() && capitalizationFlag === 0) { // properly capitalize input
+            power = obj.power;
+            capitalizationFlag++;
+          }
+          if (obj.power === power && obj.power_state === 'Control') {
+            cc += popToCC(obj.population);
+            unique++;
+            controlSystems.push(obj.name);
+          }
+        }
+      })
+      .on('close', () => {
+        const countedSystems = [];
+        // grab all unique exploited systems for the power
+        fs.createReadStream('./systems_populated.jsonl')
+          .pipe(split(JSON.parse))
+          .on('data', (sys) => { // this iterates through every system
+            for (let i = 0; i < controlSystems.length; i++) {
+              for (let j = 0; j < countedSystems.length; j++) {
+                if (distLessThan(15, controlSystems[i].x, controlSystems[i].y, controlSystems[i].z, sys.x, sys.y, sys.z) === true && sys.power_state === 'Exploited' && sys.name !== countedSystems[j]) { // if system is within sphere of control system
+                  countedSystems.push(sys.name);
+                  cc += popToCC(sys.population);
+                  unique++;
+                }
+              }
+            }
+          })
+          .on('close', () => {
+            if (cc !== 0) {
+              message.channel.send(`${power} has a sum of ${cc} CC across ${unique} systems.`);
+            } else { message.channel.send('Something went wrong. Was there a typo?'); }
+          })
+          .on('error', (err) => {
+            console.log(err);
+          });
+      })
+      .on('error', (err) => {
+        console.log(err);
+      });
   } else if (command === 'help') {
-    message.channel.send(`\`\`\`Current Version: 0.5.7
+    message.channel.send(`\`\`\`Current Version: 0.6.0
     All data is as up-to-date as possible (via eddb), bot can receive dms. Dates shown are roughly auto-corrected to tick timings.
     
     Commands:
