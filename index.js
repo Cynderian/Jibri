@@ -781,8 +781,107 @@ client.on('message', (message) => {
       .on('error', (err) => {
         console.log(err);
       });
+  } else if (command === 'mutual') {
+    console.log('working on mutual');
+    message.channel.send('Calculating... This may take some time!');
+    let input = '';
+    const inputs = [];
+    if (!args.length || args[0][0] !== '"') { // take all input after sphere and designate it the target system
+      return message.channel.send('Please define reference systems using "" (example: ~multisphere "Zhao" "Psi Octantis").');
+    }
+    // account for multi-word and multiple systems, seperated by ""
+    // combine all arguments into one string, input
+    input = args[0];
+    for (let i = 1; i < args.length; i++) { input = `${input} ${args[i]}`; }
+    // find all indicies of "
+    const indicies = [];
+    for (let i = 0; i < input.length; i++) {
+      if (input[i] === '"') indicies.push(i);
+    }
+    if (indicies.length % 2 !== 0) { // input sanitization
+      message.channel.send('Invalid input, please try again.');
+      return;
+    }
+    for (let i = 0; i < indicies.length / 2; i++) { // populate inputs
+      inputs.push(input.substring(indicies[i * 2] + 1, indicies[(i * 2) + 1]));
+    }
+    if (inputs.length <= 1) { // if one/none system
+      message.channel.send('This command requires at least 2 input systems');
+      return;
+    }
+
+    const fullInputs = [];
+    const systems = [];
+    fs.createReadStream('./systems_populated.jsonl')
+      .pipe(split(JSON.parse))
+      .on('data', (sys) => { // this iterates through every system
+        if (sys.population > 0) {
+          for (let i = 0; i < inputs.length; i++) {
+            if ((sys.name).toLowerCase() === inputs[i].toLowerCase()) { // properly capitalize input
+              const system = {};
+              system.name = sys.name;
+              system.x = sys.x;
+              system.y = sys.y;
+              system.z = sys.z;
+              fullInputs.push(system);
+            }
+          }
+        }
+      })
+      .on('close', () => {
+        let consecutive = 0;
+        const mutuals = [];
+        fs.createReadStream('./systems_populated.jsonl')
+          .pipe(split(JSON.parse))
+          .on('data', (sys) => { // this iterates through every system
+            if (sys.population > 0) {
+              for (let i = 0; i < inputs.length; i++) {
+                if (distLessThan(15, fullInputs[i].x, fullInputs[i].y, fullInputs[i].z, sys.x, sys.y, sys.z) === true) { // if system is within sphere of control system
+                  consecutive++;
+                  if (consecutive === inputs.length) {
+                    const mutual = {};
+                    mutual.name = sys.name;
+                    mutual.government = sys.government;
+                    mutual.cc = popToCC(sys.population);
+                    mutual.power = sys.power;
+                    mutual.state = sys.power_state;
+                    mutuals.push(mutual);
+                  }
+                } else { consecutive = 0; }
+              }
+            }
+          })
+          .on('close', () => {
+            let previousName = '';
+            let mutualConsecutive = 0;
+            for (let i = 0; i < systems.length; i++) {
+              if (systems[i] === previousName) {
+                mutualConsecutive++;
+              } else { mutualConsecutive = 0; }
+              if (mutualConsecutive === inputs.length) {
+                mutuals.push(systems[i]);
+              }
+              previousName = systems[i];
+            }
+
+            let inputStr = '';
+            for (let i = 0; i < fullInputs.length - 1; i++) {
+              inputStr += `${fullInputs[i].name}, `;
+            }
+            inputStr += fullInputs[fullInputs.length - 1].name;
+
+            const mutualColumns = columnify(mutuals); // tabularize info
+            message.channel.send(`\`\`\`ini\n[Mutual Systems for ${inputStr} (within a 15ly radius sphere)]\n\n${mutualColumns}\n\`\`\``);
+          })
+          .on('error', (err) => {
+            console.log(err);
+          });
+      })
+      .on('error', (err) => {
+        console.log(err);
+      });
   } else if (command === 'help') {
-    message.channel.send(`\`\`\`Current Version: 0.6.0
+    message.channel.send(`\`\`\`Current Version: 0.7.0
     All data is as up-to-date as possible (via eddb), bot can receive dms. Dates shown are roughly auto-corrected to tick timings.
     
     Commands:
@@ -792,6 +891,7 @@ client.on('message', (message) => {
     ~tick shows the last tick time
     ~multisphere <system 1> <system 2> ... <system i> shows all systems overlapped by the 15ly spheres of the input systems.
     ~cc <power> shows the total cc and systems controlled by a power
+    ~mutual <system 1> <system 2> ... <system i> shows all systems overlapped by *all* input systems' spheres
     
     The dates shown reflect when the leads were last updated; the Powerplay info is updated daily at 1am CST, via EDDB\n\`\`\``);
   }
