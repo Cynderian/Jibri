@@ -68,6 +68,13 @@ function distLessThan(dist, x1, y1, z1, x2, y2, z2) { // length of a vector
   return false;
 }
 
+/* function withinCube(dist, x1, y1, z1, x2, y2, z2) {
+  if (x2 < x1 + 10 && x2 > x1 - 10 && y2 < y1 + 10 && y2 > y1 - 10 && z2 < z1 + 10 && z2 > z1 - 10) {
+    return true;
+  }
+  return false;
+} */
+
 async function getURL(base, ...args) { // pass url and the ?/&
   // pass name, then page
   let url = base;
@@ -102,30 +109,18 @@ function popToCC(pop) { // CC given per system population
   return CC;
 }
 
-function lastUpdated(eddbData) {
+function lastUpdated(date) {
   // Convert Unix time to UTC
-  const lastUpdate = new Date(eddbData.updated_at * 1000);
+  const lastUpdate = new Date(date);
   let lastDay = lastUpdate.getDate();
   // lower date by 1 if update was before tick that day
   if (lastUpdate.getDate() > newTick.getDate()) {
     lastDay--;
   } else if (lastUpdate.getDate() === newTick.getDate()
-  && lastUpdate.getTime() <= newTick.getTime()) { // TODO: replace if needed after tick update
+  && lastUpdate.getTime() <= newTick.getTime()) {
     lastDay--;
   }
   return `${lastUpdate.getMonth() + 1}/${lastDay}`;
-}
-
-function makeEmbed(message, color, type, nameStr, leadStr, dateStr) {
-  const redAlertEmbed = new Discord.MessageEmbed()
-    .setColor(color)
-    .setTitle(`${type} systems`)
-    .addFields(
-      { name: 'System', value: nameStr, inline: true },
-      { name: 'Lead', value: leadStr, inline: true },
-      { name: 'Date', value: dateStr, inline: true },
-    );
-  message.channel.send(redAlertEmbed);
 }
 
 client.on('ready', () => {
@@ -235,6 +230,7 @@ client.on('message', (message) => {
                   system.name = data[i].docs[j].name;
                   system.id = data[i].docs[j].eddb_id;
                   system.lead = infLead(data[i], j);
+                  system.date = lastUpdated(data[i].docs[j].updated_at);
                   systemData.push(system); // push object with names to array
                 }
                 j++; // increment system selection
@@ -272,12 +268,14 @@ client.on('message', (message) => {
                     systemData[i].government = obj.government;
                     // reorganize lead in the displayed order
                     const tmp = systemData[i].lead;
+                    const tmp2 = systemData[i].date;
                     delete systemData[i].lead;
+                    delete systemData[i].date;
                     systemData[i].lead = tmp;
+                    systemData[i].date = tmp2;
                     systemData[i].cc = popToCC(obj.population);
                     systemData[i].power = obj.power;
                     systemData[i].state = obj.power_state;
-                    systemData[i].date = lastUpdated(obj);
                     i++;
                   }
                 }
@@ -314,8 +312,27 @@ client.on('message', (message) => {
                   }
                   exploitedCCStr = `${exploitedCCStr + exploitedCC} CC will be contested with ${powerName}\n`; // Needed for last iteration
                 }
-                const columns = columnify(systemData); // tabularize info
+                let columns = columnify(systemData); // tabularize info
+                let overflowColumns = '';
+                if (columns.length >= 2000) {
+                  const subStr = columns.substring(0, 1900); // for some reason, it needs to be decently <2000
+                  let index;
+                  i = 0;
+                  let flag = 0;
+                  while (flag === 0) { // search substring for starting index of latest system name below 2000 chars, with intent to make a new message from that starting point
+                    if (subStr.search(systemData[i].name) !== -1) {
+                      index = subStr.search(systemData[i].name);
+                    } else { flag = 1; }
+                    i++;
+                  }
+                  overflowColumns = columns.substring(index);
+                  columns = columns.substring(0, index);
+                }
+                console.log(columns.length);
                 message.channel.send(`\`\`\`ini\n[${refSys} Control Sphere Analysis]\n\n${columns}\n\`\`\``);
+                if (overflowColumns.length > 0) {
+                  message.channel.send(`\`\`\`\n${overflowColumns}\n\`\`\``);
+                }
                 message.channel.send(`\`\`\`\n${idealSystems}/${total} favorable systems for Aisling expansion` // favorable systems footer
                 + `\n${freeCC} CC gained by Aisling expansion` // CC gain footer
                 + `\n${exploitedCCStr}` // CC contested footer
@@ -328,7 +345,7 @@ client.on('message', (message) => {
           })
           .catch((err) => {
             console.log(`Promise problem: ${err.message}`);
-            message.channel.send('Something went wrong, likely eligebgs.app being difficult. Please try again, or if the problem persists, contact Cynder#7567');
+            message.channel.send('Something went wrong, likely elitebgs.app being difficult. Please try again, or if the problem persists, contact Cynder#7567');
           });
       })
       .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
@@ -339,7 +356,6 @@ client.on('message', (message) => {
         const tick = new Date(data[0].time);
         const tickEmbed = new Discord.MessageEmbed()
           .setColor('#0055b3')
-          .setTitle('Tick Detected')
           .setURL('https://elitebgs.app/tick')
           .setDescription(`**Latest tick was at**
           ${tick.getUTCHours()}:${tick.getUTCMinutes()} UTC, ${tick.toString().slice(4, 7)} ${tick.getUTCDate()}`)
@@ -349,132 +365,9 @@ client.on('message', (message) => {
         message.channel.send(tickEmbed);
       })
       .catch((err) => { console.log(`Error: ${err.message}`); });
-  } else if (command === 'scout') {
-    console.log('working on scout');
-    message.channel.send('Calculating...');
-    let input = '';
-    if (!args.length) { // take all input after sphere and designate it the target faction
-      return message.channel.send('Please define a reference faction.');
-    } if (args.length > 1) {
-      input = args[0];
-      for (let i = 1; i < args.length; i++) { input = `${input} ${args[i]}`; }
-    } else input = args[0];
-    input = removeQuotes(input);
-
-    const factionSystems = [];
-    // using elitebgs for data as eddb updates only at midnight, not close enough to tick
-    getURL('https://elitebgs.app/api/ebgs/v5/factions?name=', input)
-      .then((factionData) => {
-        if (factionData.total === 0) { // if system entered does not exist
-          message.channel.send('Something went wrong; was there a typo?');
-          console.log('command aborted');
-          return;
-        }
-        input = factionData.docs[0].name;
-        let i = 0;
-        // get names of all systems we control
-        do {
-          const factionSystem = {};
-          factionSystem.name = (factionData.docs[0].faction_presence[i].system_name);
-          factionSystems.push(factionSystem);
-          i++;
-        } while (factionData.docs[0].faction_presence[i]);
-        // run through system api to get all faction infs in system
-        const ebgsPromises = [];
-        for (i = 0; i < factionSystems.length; i++) {
-          const delay = (i + 1) * 500;
-          const names = factionSystems[i].name;
-          const promise = new Promise((resolve) => setTimeout(resolve, delay)).then(() => fetch(`https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&name=${names}`));
-          ebgsPromises.push(promise);
-        }
-        Promise.all(ebgsPromises)
-          .then((responses) => Promise.all(responses.map((response) => response.json())))
-          .then((data) => {
-            i = 0;
-
-            do { // loop of all systems
-              // find last updated day accounting for tick
-              let dateStr = '';
-              const lastUpdate = new Date(data[i].docs[0].updated_at);
-              let lastDay = lastUpdate.getDate();
-              // lower date by 1 if update was before tick that day
-              if (lastUpdate.getDate() > newTick.getDate()) {
-                lastDay--;
-              } else if (lastUpdate.getDate() === newTick.getDate()
-              && lastUpdate.getTime() <= newTick.getTime()) { // TODO: replace if needed after tick update
-                lastDay--;
-              }
-              if (newTick.getDate() > lastDay) { // if the tick is 1+ days ahead of the last update
-                dateStr = `${lastUpdate.getMonth() + 1}/${lastDay}(!)`;
-              } else {
-                dateStr = `${lastUpdate.getMonth() + 1}/${lastDay}`;
-              }
-
-              factionSystems[i].lead = infLead(data[i]);
-              factionSystems[i].date = dateStr;
-              i++;
-            } while (data[i]);
-            factionSystems.sort((a, b) => a.lead - b.lead); // sort from lowest to highest lead
-            let redAlertSystemsNameStr = '';
-            let redAlertSystemsLeadStr = '';
-            let redAlertSystemsDateStr = '';
-            let alertSystemsNameStr = '';
-            let alertSystemsLeadStr = '';
-            let alertSystemsDateStr = '';
-            let reportSystemsNameStr = '';
-            let reportSystemsLeadStr = '';
-            let reportSystemsDateStr = '';
-            let watchSystemsNameStr = '';
-            let watchSystemsLeadStr = '';
-            let watchSystemsDateStr = '';
-            let safeSystemsNameStr = '';
-            let safeSystemsLeadStr = '';
-            let safeSystemsDateStr = '';
-            for (i = 0; i < factionSystems.length; i++) {
-              if (factionSystems[i].lead < 5) {
-                redAlertSystemsNameStr += `${factionSystems[i].name}\n`;
-                redAlertSystemsLeadStr += `${factionSystems[i].lead}\n`;
-                redAlertSystemsDateStr += `${factionSystems[i].date}\n`;
-              } else if (factionSystems[i].lead < 10) {
-                alertSystemsNameStr += `${factionSystems[i].name}\n`;
-                alertSystemsLeadStr += `${factionSystems[i].lead}\n`;
-                alertSystemsDateStr += `${factionSystems[i].date}\n`;
-              } else if (factionSystems[i].lead < 15) {
-                reportSystemsNameStr += `${factionSystems[i].name}\n`;
-                reportSystemsLeadStr += `${factionSystems[i].lead}\n`;
-                reportSystemsDateStr += `${factionSystems[i].date}\n`;
-              } else if (factionSystems[i].lead < 20) {
-                watchSystemsNameStr += `${factionSystems[i].name}\n`;
-                watchSystemsLeadStr += `${factionSystems[i].lead}\n`;
-                watchSystemsDateStr += `${factionSystems[i].date}\n`;
-              } else {
-                safeSystemsNameStr += `${factionSystems[i].name}\n`;
-                safeSystemsLeadStr += `${factionSystems[i].lead}\n`;
-                safeSystemsDateStr += `${factionSystems[i].date}\n`;
-              }
-            }
-            if (redAlertSystemsNameStr !== '') {
-              makeEmbed(message, '#f05c44', 'Red Alert', redAlertSystemsNameStr, redAlertSystemsLeadStr, redAlertSystemsDateStr);
-            }
-            if (alertSystemsNameStr !== '') {
-              makeEmbed(message, '#ff9c1c', 'Alert', alertSystemsNameStr, alertSystemsLeadStr, alertSystemsDateStr);
-            }
-            if (reportSystemsNameStr !== '') {
-              makeEmbed(message, '#f8d404', 'Report', reportSystemsNameStr, reportSystemsLeadStr, reportSystemsDateStr);
-            }
-            if (watchSystemsNameStr !== '') {
-              makeEmbed(message, '#58ec9c', 'Watch', watchSystemsNameStr, watchSystemsLeadStr, watchSystemsDateStr);
-            }
-            if (safeSystemsNameStr !== '') {
-              makeEmbed(message, '#589c3c', 'Safe', safeSystemsNameStr, safeSystemsLeadStr, safeSystemsDateStr);
-            }
-          })
-          .catch((err) => { console.log(`Error in promise.all: ${err.message}`); });
-      })
-      .catch((err) => { console.log(`Error: ${err.message}`); });
   } else if (command === 'multisphere') {
     console.log('working on multisphere');
-    message.channel.send('Calculating... This may take some time!');
+    message.channel.send('Calculating...');
     let input = '';
     const inputs = [];
     if (!args.length || args[0][0] !== '"') { // take all input after sphere and designate it the target system
@@ -577,6 +470,7 @@ client.on('message', (message) => {
                   system.name = data[i].docs[j].name;
                   system.id = data[i].docs[j].eddb_id;
                   system.lead = infLead(data[i], j);
+                  system.date = lastUpdated(data[i].docs[j].last_updated);
                   systemData.push(system); // push object with names to array
                 }
                 j++; // increment system selection
@@ -628,7 +522,6 @@ client.on('message', (message) => {
                       sphereData[i][j].cc = popToCC(obj.population);
                       sphereData[i][j].power = obj.power;
                       sphereData[i][j].state = obj.power_state;
-                      sphereData[i][j].date = lastUpdated(obj);
                       lastLead = tmp;
                     }
                   }
@@ -641,7 +534,6 @@ client.on('message', (message) => {
                   overlapSystem.cc = popToCC(obj.population);
                   overlapSystem.power = obj.power;
                   overlapSystem.state = obj.power_state;
-                  overlapSystem.date = lastUpdated(obj);
                   overlapData.push(overlapSystem);
                   overlapTotalCC += popToCC(obj.population);
                 }
@@ -699,7 +591,7 @@ client.on('message', (message) => {
           })
           .catch((err) => {
             console.log(`Promise problem: ${err.message}`);
-            message.channel.send('Something went wrong, likely eligebgs.app being difficult. Please try again, or if the problem persists, contact Cynder#7567');
+            message.channel.send('Something went wrong, likely elitebgs.app being difficult. Please try again, or if the problem persists, contact Cynder#7567');
           });
       })
       .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
@@ -781,105 +673,6 @@ client.on('message', (message) => {
       .on('error', (err) => {
         console.log(err);
       });
-  } else if (command === 'mutual') {
-    console.log('working on mutual');
-    message.channel.send('Calculating... This may take some time!');
-    let input = '';
-    const inputs = [];
-    if (!args.length || args[0][0] !== '"') { // take all input after sphere and designate it the target system
-      return message.channel.send('Please define reference systems using "" (example: ~multisphere "Zhao" "Psi Octantis").');
-    }
-    // account for multi-word and multiple systems, seperated by ""
-    // combine all arguments into one string, input
-    input = args[0];
-    for (let i = 1; i < args.length; i++) { input = `${input} ${args[i]}`; }
-    // find all indicies of "
-    const indicies = [];
-    for (let i = 0; i < input.length; i++) {
-      if (input[i] === '"') indicies.push(i);
-    }
-    if (indicies.length % 2 !== 0) { // input sanitization
-      message.channel.send('Invalid input, please try again.');
-      return;
-    }
-    for (let i = 0; i < indicies.length / 2; i++) { // populate inputs
-      inputs.push(input.substring(indicies[i * 2] + 1, indicies[(i * 2) + 1]));
-    }
-    if (inputs.length <= 1) { // if one/none system
-      message.channel.send('This command requires at least 2 input systems');
-      return;
-    }
-
-    const fullInputs = [];
-    const systems = [];
-    fs.createReadStream('./systems_populated.jsonl')
-      .pipe(split(JSON.parse))
-      .on('data', (sys) => { // this iterates through every system
-        if (sys.population > 0) {
-          for (let i = 0; i < inputs.length; i++) {
-            if ((sys.name).toLowerCase() === inputs[i].toLowerCase()) { // properly capitalize input
-              const system = {};
-              system.name = sys.name;
-              system.x = sys.x;
-              system.y = sys.y;
-              system.z = sys.z;
-              fullInputs.push(system);
-            }
-          }
-        }
-      })
-      .on('close', () => {
-        let consecutive = 0;
-        const mutuals = [];
-        fs.createReadStream('./systems_populated.jsonl')
-          .pipe(split(JSON.parse))
-          .on('data', (sys) => { // this iterates through every system
-            if (sys.population > 0) {
-              for (let i = 0; i < inputs.length; i++) {
-                if (distLessThan(15, fullInputs[i].x, fullInputs[i].y, fullInputs[i].z, sys.x, sys.y, sys.z) === true) { // if system is within sphere of control system
-                  consecutive++;
-                  if (consecutive === inputs.length) {
-                    const mutual = {};
-                    mutual.name = sys.name;
-                    mutual.government = sys.government;
-                    mutual.cc = popToCC(sys.population);
-                    mutual.power = sys.power;
-                    mutual.state = sys.power_state;
-                    mutuals.push(mutual);
-                  }
-                } else { consecutive = 0; }
-              }
-            }
-          })
-          .on('close', () => {
-            let previousName = '';
-            let mutualConsecutive = 0;
-            for (let i = 0; i < systems.length; i++) {
-              if (systems[i] === previousName) {
-                mutualConsecutive++;
-              } else { mutualConsecutive = 0; }
-              if (mutualConsecutive === inputs.length) {
-                mutuals.push(systems[i]);
-              }
-              previousName = systems[i];
-            }
-
-            let inputStr = '';
-            for (let i = 0; i < fullInputs.length - 1; i++) {
-              inputStr += `${fullInputs[i].name}, `;
-            }
-            inputStr += fullInputs[fullInputs.length - 1].name;
-
-            const mutualColumns = columnify(mutuals); // tabularize info
-            message.channel.send(`\`\`\`ini\n[Mutual Systems for ${inputStr} (within a 15ly radius sphere)]\n\n${mutualColumns}\n\`\`\``);
-          })
-          .on('error', (err) => {
-            console.log(err);
-          });
-      })
-      .on('error', (err) => {
-        console.log(err);
-      });
   } else if (command === 'help') {
     message.channel.send(`\`\`\`Current Version: 0.7.0
     All data is as up-to-date as possible (via eddb), bot can receive dms. Dates shown are roughly auto-corrected to tick timings.
@@ -887,7 +680,6 @@ client.on('message', (message) => {
     Commands:
     ~lead <system> takes a system and finds the inf% difference between the highest inf% faction, and the 2nd highest
     ~sphere <system> designated a system as a control system, and grabs data for all populated systems within a 15ly sphere
-    ~scout <faction> shows the inf leads of all systems controlled by that faction
     ~tick shows the last tick time
     ~multisphere <system 1> <system 2> ... <system i> shows all systems overlapped by the 15ly spheres of the input systems.
     ~cc <power> shows the total cc and systems controlled by a power
