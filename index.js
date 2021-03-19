@@ -176,13 +176,29 @@ client.on('message', (message) => {
     console.log('working on sphere');
     message.channel.send('Calculating...');
     let input = '';
+    let inputPower = 'Aisling';
     if (!args.length) { // take all input after sphere and designate it the target system
       return message.channel.send('Please define a reference system.');
+    }
+    if (args[0].substring(0, 1) === '-') {
+      inputPower = capitalize(args[0].substring(1));
+      args.shift();
     }
     if (args.length > 1) {
       input = args[0]; // start at first argument to avoid an extra ' ' from for loop
       for (let i = 1; i < args.length; i++) { input = `${input} ${args[i]}`; }
     } else input = args[0];
+
+    // Power name sanitization
+    if (inputPower === 'Zachary' || inputPower === 'Hudson') {
+      inputPower = 'Hudson';
+    } else if (inputPower === 'Felica' || inputPower === 'Winters') {
+      inputPower = 'Winters';
+    } else if (inputPower !== 'Aisling') { // if not any powers supported
+      message.channel.send('Input power was not found; either it is not yet supported, or there may be a typo.');
+      return;
+    }
+
     // if systems are seperated with "", remove them for processing
     input = removeQuotes(input);
     const ebgsPromises = [];
@@ -207,6 +223,8 @@ client.on('message', (message) => {
             let favorableSystems = 0;
             let unfavorableSystems = 0;
             let neutralSystems = 0;
+            let refSysPowerState = '';
+            let refSysPower = '';
             const systemData = [];
             const exploitedData = [];
             let refSys; // reference system
@@ -227,22 +245,21 @@ client.on('message', (message) => {
                 && data[i].docs[j].name !== 'Wolfsegen') {
                   if (i === 0 && j === 0) { // Store first system name for capitalization purposes, and remove it from the output
                     refSys = data[i].docs[j].factions[0].faction_details.faction_presence.system_name;
-                  } else {
-                    const system = {};
-                    system.name = data[i].docs[j].name;
-                    system.id = data[i].docs[j].eddb_id;
-                    // determining controlling faction's government
-                    let k = 0;
-                    while (data[i].docs[j].factions[k]) {
-                      if (data[i].docs[j].controlling_minor_faction_cased === data[i].docs[j].factions[k].name) {
-                        system.government = capitalize(data[i].docs[j].factions[k].faction_details.government);
-                      }
-                      k++;
-                    }
-                    system.lead = infLead(data[i], j);
-                    system.date = lastUpdated(data[i].docs[j].updated_at);
-                    systemData.push(system); // push object with names to array
                   }
+                  const system = {};
+                  system.name = data[i].docs[j].name;
+                  system.id = data[i].docs[j].eddb_id;
+                  // determining controlling faction's government
+                  let k = 0;
+                  while (data[i].docs[j].factions[k]) {
+                    if (data[i].docs[j].controlling_minor_faction_cased === data[i].docs[j].factions[k].name) {
+                      system.government = capitalize(data[i].docs[j].factions[k].faction_details.government);
+                    }
+                    k++;
+                  }
+                  system.lead = infLead(data[i], j);
+                  system.date = lastUpdated(data[i].docs[j].updated_at);
+                  systemData.push(system); // push object with names to array
                 }
                 j++; // increment system selection
               } while (data[i].docs[j]);
@@ -260,6 +277,8 @@ client.on('message', (message) => {
                     const exploitedSystem = {};
                     if (obj.name === refSys) {
                       freeCC += popToCC(obj.population);
+                      refSysPowerState = obj.power_state;
+                      refSysPower = obj.power;
                     } else if (obj.power_state === 'Exploited') { // If exploited system
                       exploitedSystem.power = obj.power;
                       exploitedSystem.cc = popToCC(obj.population);
@@ -315,21 +334,72 @@ client.on('message', (message) => {
                 // calculate favorable/neutral/unfavorable systems
                 i = 0;
                 while (systemData[i]) {
-                  if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
-                  && systemData[i].state !== 'Control' && systemData[i].name !== refSys) {
-                    if (systemData[i].government === 'Corporate') { // TODO: grab gov types from elitebgs
-                      favorableSystems++;
-                    } else if (systemData[i].government === 'Communist' || systemData[i].government === 'Cooperative'
-                  || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
-                      unfavorableSystems++;
-                    } else { // all others, aka if neutral
-                      neutralSystems++;
+                  if (systemData[i].name === refSys) {
+                    systemData.splice(i, 1);
+                    i--;
+                  } else if (refSysPowerState === 'Control' && refSysPower === 'Aisling Duval') {
+                    if (systemData[i].state !== 'Contested') {
+                      if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
+                      || systemData[i].government === 'Confederacy') {
+                        favorableSystems++;
+                      } else if (systemData[i].government === 'Feudal' || systemData[i].government === 'Prison Colony'
+                      || systemData[i].government === 'Theocracy') {
+                        unfavorableSystems++;
+                      } else { // all others, aka if neutral
+                        neutralSystems++;
+                      }
+                    }
+                  } else if (inputPower === 'Aisling') {
+                    if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
+                  && systemData[i].state !== 'Control') {
+                      if (systemData[i].government === 'Corporate') {
+                        favorableSystems++;
+                      } else if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
+                      || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                        unfavorableSystems++;
+                      } else { // all others, aka if neutral
+                        neutralSystems++;
+                      }
+                    }
+                  } else if (inputPower === 'Hudson') {
+                    if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
+                  && systemData[i].state !== 'Control') {
+                      if (systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                        favorableSystems++;
+                      } else if (systemData[i].government === 'Dictatorship') {
+                        unfavorableSystems++;
+                      } else { // all others, aka if neutral
+                        neutralSystems++;
+                      }
+                    }
+                  } else if (inputPower === 'Winters') {
+                    if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
+                  && systemData[i].state !== 'Control') {
+                      if (systemData[i].government === 'Corporate') {
+                        favorableSystems++;
+                      } else if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
+                      || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                        unfavorableSystems++;
+                      } else { // all others, aka if neutral
+                        neutralSystems++;
+                      }
                     }
                   }
                   i++;
                 }
 
-                // These two sorts produce an output sorted by power first, gov second
+                // shenanigans to get the sort to work correctly when null values exist
+                i = 0;
+                while (systemData[i]) {
+                  if (systemData[i].power === null) {
+                    systemData[i].power = '';
+                  }
+                  if (systemData[i].state === null) {
+                    systemData[i].state = '';
+                  }
+                  i++;
+                }
+                // These three sorts produce an output sorted by power first, gov second
                 systemData.sort((a, b) => { // sorts systems by government
                   const nameA = a.government;
                   const nameB = b.government;
@@ -337,13 +407,13 @@ client.on('message', (message) => {
                   if (nameA > nameB) { return 1; }
                   return 0;
                 });
-                i = 0;
-                while (systemData[i]) { // shenanigans to get the sort to work correctly when null values exist
-                  if (systemData[i].power === null) {
-                    systemData[i].power = '';
-                  }
-                  i++;
-                }
+                systemData.sort((a, b) => { // sorts systems by power state
+                  const nameA = a.state;
+                  const nameB = b.state;
+                  if (nameA < nameB) { return -1; }
+                  if (nameA > nameB) { return 1; }
+                  return 0;
+                });
                 systemData.sort((a, b) => { // sorts systems by power
                   const nameA = a.power;
                   const nameB = b.power;
@@ -373,10 +443,19 @@ client.on('message', (message) => {
                 if (overflowColumns.length > 0) {
                   message.channel.send(`\`\`\`\n${overflowColumns}\n\`\`\``);
                 }
-                message.channel.send(`\`\`\`\n${favorableSystems}/${neutralSystems}/${unfavorableSystems} favorable/neutral/unfavorable systems for Aisling expansion` // favorable systems footer
-                + `\n${freeCC} CC gained by Aisling expansion` // CC gain footer
-                + `\n${exploitedCCStr}` // CC contested footer
-                + '\n```');
+
+                let footerInfo = '';
+                let setType = 'expansion';
+                if (refSysPowerState === 'Control' && refSysPower === 'Aisling Duval') {
+                  inputPower = 'Aisling';
+                  setType = 'control';
+                } else {
+                  footerInfo = `${freeCC} CC gained by ${inputPower} expansion\n${exploitedCCStr}`;
+                }
+                message.channel.send(`\`\`\`\n${favorableSystems}/${neutralSystems}/${unfavorableSystems} favorable/neutral/unfavorable systems for ${inputPower} ${setType}\n${
+                  footerInfo
+                }\n\`\`\``);
+
                 console.log('command done');
               })
               .on('error', (err) => {
@@ -719,10 +798,9 @@ client.on('message', (message) => {
     
     Commands:
     ~lead <system> takes a system and finds the inf% difference between the highest inf% faction, and the 2nd highest
-    ~sphere <system> designated a system as a control system, and grabs data for all populated systems within a 15ly sphere
+    ~sphere -<power (optional)> <system> designated a system as a control system, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead shows control ratios. Only supports Hudson/Winters/Aisling currently. Example: ~sphere -Hudson Mbambiva
     ~tick shows the last tick time
     ~multisphere <system 1> <system 2> ... <system i> shows all systems overlapped by the 15ly spheres of the input systems.
-    ~mutual <system 1> <system 2> ... <system i> shows all systems overlapped by *all* input systems' spheres
     ~cc <power> shows the total cc and systems controlled by a power
     
     The dates shown reflect when the leads were last updated; the Powerplay info is updated daily at 1am CST, via EDDB\n\`\`\``);
