@@ -41,13 +41,13 @@ function mirrorEddb() {
   });
 }
 
-/* function capitalize(str) {
+function capitalize(str) {
   const words = str.split(' ');
   for (let i = 0; i < words.length; i++) {
     words[i] = words[i][0].toUpperCase() + words[i].substr(1);
   }
   return words.join(' ');
-} */
+}
 
 function removeQuotes(input) {
   if (input[0] === '"' && input[0] === input[input.length - 1]) {
@@ -201,9 +201,10 @@ client.on('message', (message) => {
           .then((responses) => Promise.all(responses.map((response) => response.json())))
           .then((data) => {
             let i = 0;
-            let total = 0;
             let freeCC = 0;
-            let idealSystems = 0;
+            let favorableSystems = 0;
+            let unfavorableSystems = 0;
+            let neutralSystems = 0;
             const systemData = [];
             const exploitedData = [];
             let refSys; // reference system
@@ -222,13 +223,20 @@ client.on('message', (message) => {
                 && data[i].docs[j].name !== 'Tarnkappe'
                 && data[i].docs[j].name !== 'Tyet'
                 && data[i].docs[j].name !== 'Wolfsegen') {
-                  total++; // increment total trigger counting systems
                   if (i === 0 && j === 0) { // Store first system name for capitalization purposes
                     refSys = data[i].docs[j].factions[0].faction_details.faction_presence.system_name;
                   }
                   const system = {};
                   system.name = data[i].docs[j].name;
                   system.id = data[i].docs[j].eddb_id;
+                  // determining controlling faction's government
+                  let k = 0;
+                  while (data[i].docs[j].factions[k]) {
+                    if (data[i].docs[j].controlling_minor_faction_cased === data[i].docs[j].factions[k].name) {
+                      system.government = capitalize(data[i].docs[j].factions[k].faction_details.government);
+                    }
+                    k++;
+                  }
                   system.lead = infLead(data[i], j);
                   system.date = lastUpdated(data[i].docs[j].updated_at);
                   systemData.push(system); // push object with names to array
@@ -249,30 +257,18 @@ client.on('message', (message) => {
                     const exploitedSystem = {};
                     if (obj.name === refSys) {
                       freeCC += popToCC(obj.population);
-                      total--;
                     } else if (obj.power_state === 'Exploited') { // If exploited system
                       exploitedSystem.power = obj.power;
                       exploitedSystem.cc = popToCC(obj.population);
                       exploitedData.push(exploitedSystem);
-                      total--; // to be contested systems will not count towards triggers
+                      // to be contested systems will not count towards triggers
                     } else if (obj.power_state === 'Contested' || obj.power_state === 'Control') {
-                      total--; // contested systems do not count towards triggers
+                      // contested systems do not count towards triggers
                     } else {
                       freeCC += popToCC(obj.population);
-                      if (obj.government === 'Corporate') {
-                        idealSystems++;
-                      }
                     }
 
                     // Add data to object array
-                    systemData[i].government = obj.government;
-                    // reorganize lead in the displayed order
-                    const tmp = systemData[i].lead;
-                    const tmp2 = systemData[i].date;
-                    delete systemData[i].lead;
-                    delete systemData[i].date;
-                    systemData[i].lead = tmp;
-                    systemData[i].date = tmp2;
                     systemData[i].cc = popToCC(obj.population);
                     systemData[i].power = obj.power;
                     systemData[i].state = obj.power_state;
@@ -312,7 +308,25 @@ client.on('message', (message) => {
                   }
                   exploitedCCStr = `${exploitedCCStr + exploitedCC} CC will be contested with ${powerName}\n`; // Needed for last iteration
                 }
+
+                // calculate favorable/neutral/unfavorable systems
+                i = 0;
+                while (systemData[i]) {
+                  if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
+                  && systemData[i].state !== 'Control' && systemData[i].name !== refSys) {
+                    if (systemData[i].government === 'Corporate') { // TODO: grab gov types from elitebgs
+                      favorableSystems++;
+                    } else if (systemData[i].government === 'Communist' || systemData[i].government === 'Cooperative'
+                  || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                      unfavorableSystems++;
+                    } else { // all others, aka if neutral
+                      neutralSystems++;
+                    }
+                  }
+                  i++;
+                }
                 let columns = columnify(systemData); // tabularize info
+                // In case of >2000 character message overflow
                 let overflowColumns = '';
                 if (columns.length >= 2000) {
                   const subStr = columns.substring(0, 1900); // for some reason, it needs to be decently <2000
@@ -328,12 +342,11 @@ client.on('message', (message) => {
                   overflowColumns = columns.substring(index);
                   columns = columns.substring(0, index);
                 }
-                console.log(columns.length);
                 message.channel.send(`\`\`\`ini\n[${refSys} Control Sphere Analysis]\n\n${columns}\n\`\`\``);
                 if (overflowColumns.length > 0) {
                   message.channel.send(`\`\`\`\n${overflowColumns}\n\`\`\``);
                 }
-                message.channel.send(`\`\`\`\n${idealSystems}/${total} favorable systems for Aisling expansion` // favorable systems footer
+                message.channel.send(`\`\`\`\n${favorableSystems}/${neutralSystems}/${unfavorableSystems} favorable/neutral/unfavorable systems for Aisling expansion` // favorable systems footer
                 + `\n${freeCC} CC gained by Aisling expansion` // CC gain footer
                 + `\n${exploitedCCStr}` // CC contested footer
                 + '\n```');
@@ -430,7 +443,7 @@ client.on('message', (message) => {
           .then((data) => {
             // const totalSys = [];
             // let freeCC = 0;
-            // let idealSystems = 0;
+            // let favorableSystems = 0;
             let overlapTotalCC = 0;
             const sphereData = [];
             let systemData = [];
@@ -509,7 +522,7 @@ client.on('message', (message) => {
                         } else {
                           freeCC += popToCC(obj.population);
                           if (obj.government === 'Corporate') {
-                            idealSystems++;
+                            favorableSystems++;
                           }
                         }
                       } */
