@@ -16,6 +16,7 @@ const Discord = require('discord.js');
 const { prefix, token } = require('./config.json');
 
 let newTick = '';
+const today = new Date();
 const client = new Discord.Client(); // game start!
 
 function mirrorEddb() {
@@ -27,9 +28,10 @@ function mirrorEddb() {
     });
   };
   const url = 'https://eddb.io/archive/v6/systems_populated.jsonl';
-  const path = 'systems_populated.jsonl';
+  // save file as data for day before
+  const path = `systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`;
   download(url, path, () => {
-    exec('truncate -s -1 systems_populated.jsonl', (error, stdout, stderr) => {
+    exec(`truncate -s -1 systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`, (error, stdout, stderr) => {
       console.log(stdout);
       console.log(stderr);
       if (error !== null) {
@@ -223,23 +225,24 @@ client.on('message', (message) => {
                 && data[i].docs[j].name !== 'Tarnkappe'
                 && data[i].docs[j].name !== 'Tyet'
                 && data[i].docs[j].name !== 'Wolfsegen') {
-                  if (i === 0 && j === 0) { // Store first system name for capitalization purposes
+                  if (i === 0 && j === 0) { // Store first system name for capitalization purposes, and remove it from the output
                     refSys = data[i].docs[j].factions[0].faction_details.faction_presence.system_name;
-                  }
-                  const system = {};
-                  system.name = data[i].docs[j].name;
-                  system.id = data[i].docs[j].eddb_id;
-                  // determining controlling faction's government
-                  let k = 0;
-                  while (data[i].docs[j].factions[k]) {
-                    if (data[i].docs[j].controlling_minor_faction_cased === data[i].docs[j].factions[k].name) {
-                      system.government = capitalize(data[i].docs[j].factions[k].faction_details.government);
+                  } else {
+                    const system = {};
+                    system.name = data[i].docs[j].name;
+                    system.id = data[i].docs[j].eddb_id;
+                    // determining controlling faction's government
+                    let k = 0;
+                    while (data[i].docs[j].factions[k]) {
+                      if (data[i].docs[j].controlling_minor_faction_cased === data[i].docs[j].factions[k].name) {
+                        system.government = capitalize(data[i].docs[j].factions[k].faction_details.government);
+                      }
+                      k++;
                     }
-                    k++;
+                    system.lead = infLead(data[i], j);
+                    system.date = lastUpdated(data[i].docs[j].updated_at);
+                    systemData.push(system); // push object with names to array
                   }
-                  system.lead = infLead(data[i], j);
-                  system.date = lastUpdated(data[i].docs[j].updated_at);
-                  systemData.push(system); // push object with names to array
                 }
                 j++; // increment system selection
               } while (data[i].docs[j]);
@@ -248,7 +251,7 @@ client.on('message', (message) => {
             i = 0; // reset for readStream loop
             systemData.sort((a, b) => a.id - b.id); // sorts systems by ID lowest to highest
             console.log('reading local file');
-            fs.createReadStream('./systems_populated.jsonl')
+            fs.createReadStream(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`)
               .pipe(split(JSON.parse))
               .on('data', (obj) => { // this iterates through every system
                 if (systemData[i] != null) {
@@ -325,6 +328,30 @@ client.on('message', (message) => {
                   }
                   i++;
                 }
+
+                // These two sorts produce an output sorted by power first, gov second
+                systemData.sort((a, b) => { // sorts systems by government
+                  const nameA = a.government;
+                  const nameB = b.government;
+                  if (nameA < nameB) { return -1; }
+                  if (nameA > nameB) { return 1; }
+                  return 0;
+                });
+                i = 0;
+                while (systemData[i]) { // shenanigans to get the sort to work correctly when null values exist
+                  if (systemData[i].power === null) {
+                    systemData[i].power = '';
+                  }
+                  i++;
+                }
+                systemData.sort((a, b) => { // sorts systems by power
+                  const nameA = a.power;
+                  const nameB = b.power;
+                  if (nameA < nameB) { return -1; }
+                  if (nameA > nameB) { return 1; }
+                  return 0;
+                });
+
                 let columns = columnify(systemData); // tabularize info
                 // In case of >2000 character message overflow
                 let overflowColumns = '';
@@ -497,7 +524,7 @@ client.on('message', (message) => {
             console.log('reading local file');
             i = 0; // reset for readStream split loop
             let j = 0;
-            fs.createReadStream('./systems_populated.jsonl')
+            fs.createReadStream(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`)
               .pipe(split(JSON.parse))
               .on('data', (obj) => { // this iterates through every system
                 let overlapIndicator = 0;
@@ -628,7 +655,7 @@ client.on('message', (message) => {
     let capitalizationFlag = 0;
     let power = '';
     // grab all control systems for the power
-    fs.createReadStream('./systems_populated.jsonl')
+    fs.createReadStream(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`)
       .pipe(split(JSON.parse))
       .on('data', (obj) => { // this iterates through every system
         if (obj.power !== null) {
@@ -651,7 +678,7 @@ client.on('message', (message) => {
       .on('close', () => {
         const countedSystems = [];
         // grab all unique exploited systems for the power
-        fs.createReadStream('./systems_populated.jsonl')
+        fs.createReadStream(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`)
           .pipe(split(JSON.parse))
           .on('data', (sys) => { // this iterates through every system
             if (sys.population > 0) {
@@ -695,8 +722,8 @@ client.on('message', (message) => {
     ~sphere <system> designated a system as a control system, and grabs data for all populated systems within a 15ly sphere
     ~tick shows the last tick time
     ~multisphere <system 1> <system 2> ... <system i> shows all systems overlapped by the 15ly spheres of the input systems.
-    ~cc <power> shows the total cc and systems controlled by a power
     ~mutual <system 1> <system 2> ... <system i> shows all systems overlapped by *all* input systems' spheres
+    ~cc <power> shows the total cc and systems controlled by a power
     
     The dates shown reflect when the leads were last updated; the Powerplay info is updated daily at 1am CST, via EDDB\n\`\`\``);
   }
