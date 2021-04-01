@@ -19,6 +19,72 @@ let newTick = '';
 const today = new Date();
 const client = new Discord.Client(); // game start!
 
+function HQDistances(power, x, y, z) {
+  let HQx;
+  let HQy;
+  let HQz;
+  if (power === 'Aisling Duval') {
+    HQx = 128.28125;
+    HQy = -155.625;
+    HQz = 84.21875;
+  }
+  if (power === 'Arissa Lavigny-Duval') {
+    HQx = 110;
+    HQy = -99.96875;
+    HQz = -13.375;
+  }
+  if (power === 'Edmund Mahon') {
+    HQx = -11;
+    HQy = 77.84375;
+    HQz = -0.875;
+  }
+  if (power === 'Zachary Hudson') {
+    HQx = -14.78125;
+    HQy = 19.65625;
+    HQz = -15.25;
+  }
+  if (power === 'Archon Delaine') {
+    HQx = -99.25;
+    HQy = -100.96875;
+    HQz = 20.40625;
+  }
+  if (power === 'Denton Patreus') {
+    HQx = 49.5;
+    HQy = -104.03125;
+    HQz = 6.3125;
+  }
+  if (power === 'Yuri Grom') {
+    HQx = -20.5;
+    HQy = -4.96875;
+    HQz = 60.6875;
+  }
+  if (power === 'Felicia Winters') {
+    HQx = 58.125;
+    HQy = 22.59375;
+    HQz = -28.59375;
+  }
+  if (power === 'Li Yong-Rui') {
+    HQx = -43.25;
+    HQy = -64.34375;
+    HQz = -77.6875;
+  }
+  if (power === 'Zemina Torval') {
+    HQx = 51.78125;
+    HQy = -76.40625;
+    HQz = 28.71875;
+  }
+  if (power === 'Pranav Antal') {
+    HQx = -79.90625;
+    HQy = -87.46875;
+    HQz = -33.53125;
+  }
+
+  const a = x - HQx;
+  const b = y - HQy;
+  const c = z - HQz;
+  return Math.sqrt((a * a) + (b * b) + (c * c));
+}
+
 function isOnline(url) {
   return new Promise((resolve, reject) => {
     request(url, (error, response, body) => {
@@ -273,13 +339,6 @@ function mirrorEddb() {
     console.log(`EDDB jsonl mirrored at ${now}`);
   });
   download(urlTwo, pathTwo, () => {
-    exec(`truncate -s -1 systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`, (error, stdout, stderr) => {
-      console.log(stdout);
-      console.log(stderr);
-      if (error !== null) {
-        console.log(`exec error: ${error}`);
-      }
-    });
     const now = new Date();
     console.log(`EDDB json mirrored at ${now}`);
   });
@@ -349,7 +408,7 @@ client.on('message', (message) => {
     console.log('working on sphere');
     message.channel.send('Calculating...');
     let input = '';
-    let inputPower = 'Aisling';
+    let inputPower = 'Aisling Duval';
     if (!args.length) { // take all input after sphere and designate it the target system
       return message.channel.send('Please define a reference system.');
     }
@@ -364,10 +423,28 @@ client.on('message', (message) => {
 
     // Power name sanitization
     if (inputPower === 'Zachary' || inputPower === 'Hudson') {
-      inputPower = 'Hudson';
-    } else if (inputPower === 'Felica' || inputPower === 'Winters') {
-      inputPower = 'Winters';
-    } else if (inputPower !== 'Aisling') { // if not any powers supported
+      inputPower = 'Zachary Hudson';
+    } else if (inputPower === 'Felicia' || inputPower === 'Winters') {
+      inputPower = 'Felicia Winters';
+    } else if (inputPower === 'Arissa' || inputPower === 'Lavigny-Duval') {
+      inputPower = 'Arissa Lavigny-Duval';
+    } else if (inputPower === 'Edmund' || inputPower === 'Mahon') {
+      inputPower = 'Edmund Mahon';
+    } else if (inputPower === 'Archon' || inputPower === 'Delaine') {
+      inputPower = 'Archon Delaine';
+    } else if (inputPower === 'Denton' || inputPower === 'Patreus') {
+      inputPower = 'Denton Patreus';
+    } else if (inputPower === 'Yuri' || inputPower === 'Grom') {
+      inputPower = 'Yuri Grom';
+    } else if (inputPower === 'Li' || inputPower === 'Yong-Rui' || inputPower === 'LYR') {
+      inputPower = 'Li Yong-Rui';
+    } else if (inputPower === 'Zemina' || inputPower === 'Torval') {
+      inputPower = 'Zamina Torval';
+    } else if (inputPower === 'Pranav' || inputPower === 'Antal') {
+      inputPower = 'Pranav Antal';
+    } else if (inputPower === 'Aisling' || inputPower === 'Aisling Duval') {
+      inputPower = 'Aisling Duval';
+    } else {
       message.channel.send('Input power was not found; either it is not yet supported, or there may be a typo.');
       return;
     }
@@ -384,10 +461,14 @@ client.on('message', (message) => {
         }
         systemData = Array.from(tmpData);
 
-        let freeCC = 0;
+        let grossCC = 0;
         let favorableSystems = 0;
         let unfavorableSystems = 0;
         let neutralSystems = 0;
+        let powerControlSys = 0;
+        let refSysx;
+        let refSysy;
+        let refSysz;
         let refSysPowerState = '';
         let refSysPower = '';
         const exploitedData = [];
@@ -403,9 +484,12 @@ client.on('message', (message) => {
                 const exploitedSystem = {};
                 if ((obj.name).toLowerCase() === input.toLowerCase()) {
                   refSys = obj.name;
-                  freeCC += popToCC(obj.population);
+                  grossCC += popToCC(obj.population);
                   refSysPowerState = obj.power_state;
                   refSysPower = obj.power;
+                  refSysx = obj.x;
+                  refSysy = obj.y;
+                  refSysz = obj.z;
                 } else if (obj.power_state === 'Exploited') { // If exploited system
                   exploitedSystem.power = obj.power;
                   exploitedSystem.cc = popToCC(obj.population);
@@ -414,7 +498,7 @@ client.on('message', (message) => {
                 } else if (obj.power_state === 'Contested' || obj.power_state === 'Control') {
                   // contested systems do not count towards triggers
                 } else {
-                  freeCC += popToCC(obj.population);
+                  grossCC += popToCC(obj.population);
                 }
 
                 // Add data to object array
@@ -424,6 +508,9 @@ client.on('message', (message) => {
                 i++;
               }
             }
+            if (obj.power === inputPower && obj.power_state === 'Control') {
+              powerControlSys++;
+            }
           })
           .on('close', () => { // acting as .then for createReadStream
             i = 0;
@@ -431,6 +518,11 @@ client.on('message', (message) => {
               delete systemData[i].id;
               i++;
             }
+            // math for cc calculations
+            const HQDistance = HQDistances(inputPower, refSysx, refSysy, refSysz);
+            const overhead = Math.ceil((Math.min(((11.5 * powerControlSys) / 42) ** 3, 5.4 * 11.5 * powerControlSys)) / powerControlSys);
+            const upkeep = Math.ceil((HQDistance ** 2) * 0.001 + 20);
+            const netCC = grossCC - overhead - upkeep;
             // convert contested CC values into readable strings
             // Sort by power alphabetically
             exploitedData.sort((a, b) => {
@@ -476,19 +568,24 @@ client.on('message', (message) => {
                     neutralSystems++;
                   }
                 }
-              } else if (inputPower === 'Aisling') {
+                // expansion un/favorables
+              } else if (inputPower === 'Aisling Duval' || inputPower === 'Felicica Winters'
+                        || inputPower === 'Edward Mahon' || inputPower === 'Li Yong-Rui'
+                        || inputPower === 'Zemina Torval') {
                 if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
                   && systemData[i].state !== 'Control') {
                   if (systemData[i].government === 'Corporate') {
                     favorableSystems++;
                   } else if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
-                      || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                            || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
                     unfavorableSystems++;
                   } else { // all others, aka if neutral
                     neutralSystems++;
                   }
                 }
-              } else if (inputPower === 'Hudson') {
+              } else if (inputPower === 'Zachary Hudson' || inputPower === 'Arissa Lavigny-Duval'
+                        || inputPower === 'Archon Delaine' || inputPower === 'Denton Patreus'
+                        || inputPower === 'Yuri Grom') {
                 if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
                   && systemData[i].state !== 'Control') {
                   if (systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
@@ -499,13 +596,14 @@ client.on('message', (message) => {
                     neutralSystems++;
                   }
                 }
-              } else if (inputPower === 'Winters') {
+              } else if (inputPower === 'Pranav Antal') {
                 if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
                   && systemData[i].state !== 'Control') {
-                  if (systemData[i].government === 'Corporate') {
+                  if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
+                    || systemData[i].government === 'Confederacy') {
                     favorableSystems++;
-                  } else if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
-                      || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                  } else if (systemData[i].government === 'Feudal' || systemData[i].government === 'Prison Colony'
+                    || systemData[i].government === 'Theocracy') {
                     unfavorableSystems++;
                   } else { // all others, aka if neutral
                     neutralSystems++;
@@ -577,7 +675,7 @@ client.on('message', (message) => {
               inputPower = 'Aisling';
               setType = 'control';
             } else {
-              footerInfo = `${freeCC} CC gained by ${inputPower} expansion\n${exploitedCCStr}`;
+              footerInfo = `${netCC.toFixed(2)} CC gained by ${inputPower} expansion\n${exploitedCCStr}`;
             }
             message.channel.send(`\`\`\`\n${favorableSystems}/${neutralSystems}/${unfavorableSystems} favorable/neutral/unfavorable systems for ${inputPower} ${setType}\n${
               footerInfo
@@ -669,7 +767,7 @@ client.on('message', (message) => {
           .then((responses) => Promise.all(responses.map((response) => response.json())))
           .then((data) => {
             // const totalSys = [];
-            // let freeCC = 0;
+            // let grossCC = 0;
             // let favorableSystems = 0;
             let overlapTotalCC = 0;
             const sphereData = [];
@@ -737,7 +835,7 @@ client.on('message', (message) => {
                       /* const exploitedSystem = {};
                       for (i = 0; i < refSys.length; i++) {
                         if (obj.name === refSys[i]) {
-                          freeCC += popToCC(obj.population);
+                          grossCC += popToCC(obj.population);
                           total--;
                         } else if (obj.power_state === 'Exploited') { // If exploited system
                           exploitedSystem.power = obj.power;
@@ -747,7 +845,7 @@ client.on('message', (message) => {
                         } else if (obj.power_state === 'Contested' || obj.power_state === 'Control') {
                           total--; // contested systems do not count towards triggers
                         } else {
-                          freeCC += popToCC(obj.population);
+                          grossCC += popToCC(obj.population);
                           if (obj.government === 'Corporate') {
                             favorableSystems++;
                           }
