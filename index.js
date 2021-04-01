@@ -439,7 +439,7 @@ client.on('message', (message) => {
     } else if (inputPower === 'Li' || inputPower === 'Yong-Rui' || inputPower === 'LYR') {
       inputPower = 'Li Yong-Rui';
     } else if (inputPower === 'Zemina' || inputPower === 'Torval') {
-      inputPower = 'Zamina Torval';
+      inputPower = 'Zemina Torval';
     } else if (inputPower === 'Pranav' || inputPower === 'Antal') {
       inputPower = 'Pranav Antal';
     } else if (inputPower === 'Aisling' || inputPower === 'Aisling Duval') {
@@ -466,6 +466,7 @@ client.on('message', (message) => {
         let unfavorableSystems = 0;
         let neutralSystems = 0;
         let powerControlSys = 0;
+        let netContestedCC = 0;
         let refSysx;
         let refSysy;
         let refSysz;
@@ -495,8 +496,11 @@ client.on('message', (message) => {
                   exploitedSystem.cc = popToCC(obj.population);
                   exploitedData.push(exploitedSystem);
                   // to be contested systems will not count towards triggers
-                } else if (obj.power_state === 'Contested' || obj.power_state === 'Control') {
+                } else if (obj.power_state === 'Contested') {
+                  netContestedCC += popToCC(obj.population);
                   // contested systems do not count towards triggers
+                } else if (obj.power_state === 'Control') {
+                  // control systems do not count towards triggers
                 } else {
                   grossCC += popToCC(obj.population);
                 }
@@ -534,6 +538,7 @@ client.on('message', (message) => {
             });
             // convert to readable string
             let exploitedCCStr = '';
+            let netExploitedCC = 0;
             if (exploitedData.length !== 0) {
               let powerName = exploitedData[0].power; // set initial power
               exploitedCCStr = '';
@@ -541,6 +546,7 @@ client.on('message', (message) => {
               for (i = 0; i < exploitedData.length; i++) { // Add CC by power
                 if (powerName === exploitedData[i].power) {
                   exploitedCC += exploitedData[i].cc;
+                  netExploitedCC += exploitedData[i].cc;
                 } else {
                   exploitedCCStr = `${exploitedCCStr + exploitedCC} CC will be contested with ${powerName}\n`;
                   powerName = exploitedData[i].power;
@@ -664,22 +670,21 @@ client.on('message', (message) => {
               overflowColumns = columns.substring(index);
               columns = columns.substring(0, index);
             }
+            // main text
             message.channel.send(`\`\`\`ini\n[${refSys} Control Sphere Analysis]\n\n${columns}\n\`\`\``);
             if (overflowColumns.length > 0) {
               message.channel.send(`\`\`\`\n${overflowColumns}\n\`\`\``);
             }
 
+            // footer
             let footerInfo = '';
             let setType = 'expansion';
             if (refSysPowerState === 'Control' && refSysPower === 'Aisling Duval') {
-              inputPower = 'Aisling';
               setType = 'control';
             } else {
-              footerInfo = `${netCC.toFixed(2)} CC gained by ${inputPower} expansion\n${exploitedCCStr}`;
+              footerInfo = `${exploitedCCStr}`;
             }
-            message.channel.send(`\`\`\`\n${favorableSystems}/${neutralSystems}/${unfavorableSystems} favorable/neutral/unfavorable systems for ${inputPower} ${setType}\n${
-              footerInfo
-            }\n\`\`\``);
+            message.channel.send(`\`\`\`\n${favorableSystems}/${neutralSystems}/${unfavorableSystems} favorable/neutral/unfavorable systems for ${inputPower} ${setType}\nSphere gross value: ${grossCC + netExploitedCC + netContestedCC}CC\n${footerInfo}Net CC gained: ${netCC.toFixed(0)}CC\n\`\`\``);
 
             console.log('command done');
           })
@@ -1012,12 +1017,12 @@ client.on('message', (message) => {
         console.log(err);
       });
   } else if (command === 'help') {
-    message.channel.send(`\`\`\`Current Version: 0.7.0
+    message.channel.send(`\`\`\`Current Version: 0.7.2
     All data is as up-to-date as possible (via eddb), bot can receive dms. Dates shown are roughly auto-corrected to tick timings.
     
     Commands:
     ~lead <system> takes a system and finds the inf% difference between the highest inf% faction, and the 2nd highest
-    ~sphere -<power (optional)> <system> designated a system as a control system, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead shows control ratios. Only supports Hudson/Winters/Aisling currently. Example: ~sphere -Hudson Mbambiva
+    ~sphere -<power (optional)> <system> designated a system as a control system, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead shows control ratios (only for Aisling currently for control). Example: ~sphere -Winters Mbambiva
     ~tick shows the last tick time
     ~multisphere <system 1> <system 2> ... <system i> shows all systems overlapped by the 15ly spheres of the input systems.
     ~cc <power> shows the total cc and systems controlled by a power
