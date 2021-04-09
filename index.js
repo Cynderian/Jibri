@@ -357,9 +357,7 @@ function mirrorEddb() {
   const pathOne = `systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`;
   const pathTwo = `systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.json`;
   download(urlOne, pathOne, () => {
-    exec(`truncate -s -1 systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`, (error, stdout, stderr) => {
-      console.log(stdout);
-      console.log(stderr);
+    exec(`truncate -s -1 systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`, (error) => {
       if (error !== null) {
         console.log(`exec error: ${error}`);
       }
@@ -818,205 +816,86 @@ client.on('message', (message) => {
     }
 
     const spheresPromises = [];
-    const ebgsPromises = [];
+    const overlapData = [];
+    const allSystems = [];
     for (let i = 0; i < inputs.length; i++) {
-      const delay = i * 1000;
-      const promise = new Promise((resolve) => setTimeout(resolve, delay)).then(() => fetch(`https://elitebgs.app/api/ebgs/v5/systems?sphere=true&factionDetails=true&referenceDistance=15&referenceSystem=${inputs[i]}`));
+      const delay = i * 200;
+      const promise = new Promise((resolve) => setTimeout(resolve, delay)).then(() => ebgsOrEddb(message, `https://elitebgs.app/api/ebgs/v5/systems?sphere=true&factionDetails=true&referenceDistance=15&referenceSystem=${inputs[i]}`, inputs[i]));
       spheresPromises.push(promise);
     }
     Promise.all(spheresPromises)
-      .then((responses) => Promise.all(responses.map((response) => response.json())))
-      .then((spheresData) => {
-        const pages = [];
+      .then((tmpData) => {
         let i = 0;
-        let page = 0;
-        // for every sphere, find a list of systems
-        while (spheresData[i]) {
-          if (spheresData[i].total === 0) { // if system entered does not exist
-            message.channel.send('Something went wrong; was there a typo?');
-            console.log('command aborted');
+        while (tmpData[i]) {
+          if (tmpData[i] === 'error') { // little jank but works
             return;
           }
-          for (let j = 1; j < spheresData[i].pages + 1; j++) { // page starts at 1
-            const iterator = i; // make variable safe
-            const delay = j * 1000;
-            const promise = new Promise((resolve) => setTimeout(resolve, delay)).then(() => fetch(`https://elitebgs.app/api/ebgs/v5/systems?sphere=true&factionDetails=true&referenceDistance=15&referenceSystem=${inputs[iterator]}&page=${j}`));
-            ebgsPromises.push(promise);
-            page++;
-          }
-          pages.push(page);
           i++;
         }
-        Promise.all(ebgsPromises)
-          .then((responses) => Promise.all(responses.map((response) => response.json())))
-          .then((data) => {
-            // const totalSys = [];
-            // let grossCC = 0;
-            // let favorableSystems = 0;
-            let overlapTotalCC = 0;
-            const sphereData = [];
-            let systemData = [];
-            // const exploitedData = [];
-            const overlapData = [];
-            let sphereNumber = 0;
-            const refSys = []; // reference systems
-            i = 0;
-            do { // Iterate through each page
-              let j = 0;
-              do { // Iterate through each system
-                // Check for special systems, excluded from PP/BGS
-                if (data[i].docs[j].name !== 'Shinrarta Dezhra' // you know where this is
-                && data[i].docs[j].name !== 'Azoth' // 10 starter systems
-                && data[i].docs[j].name !== 'Dromi'
-                && data[i].docs[j].name !== 'Lia Fall'
-                && data[i].docs[j].name !== 'Matet'
-                && data[i].docs[j].name !== 'Orna'
-                && data[i].docs[j].name !== 'Otegine'
-                && data[i].docs[j].name !== 'Sharur'
-                && data[i].docs[j].name !== 'Tarnkappe'
-                && data[i].docs[j].name !== 'Tyet'
-                && data[i].docs[j].name !== 'Wolfsegen') {
-                  if (i === 0 && j === 0) { // Store first system name
-                    refSys.push(data[i].docs[j].factions[0].faction_details.faction_presence.system_name);
-                  }
-                  if (pages[sphereNumber] < i + 1) { // when the pages enter a new sphere
-                    refSys.push(data[i].docs[j].factions[0].faction_details.faction_presence.system_name);
-                    // if (totalSys.length === 0) { // totalSys is additive
-                    //   totalSys.push(data[i].docs[j].total);
-                    // } else { totalSys.push(totalSys[i - 1] + data[i].docs[j].total); }
-                    sphereData.push(systemData);
-                    systemData = []; // clear systems to prepare for the next sphere
-                    sphereNumber++;
-                  }
-                  const system = {};
-                  system.name = data[i].docs[j].name;
-                  system.id = data[i].docs[j].eddb_id;
-                  system.lead = infLead(data[i], j);
-                  system.date = lastUpdated(data[i].docs[j].last_updated);
-                  systemData.push(system); // push object with names to array
-                }
-                j++; // increment system selection
-              } while (data[i].docs[j]);
-              i++; // increment page selection
-            } while (data[i]);
-            sphereData.push(systemData); // push last sphere
-            for (i = 0; i < sphereData.length; i++) {
-              sphereData[i].sort((a, b) => a.id - b.id); // sorts systems by ID lowest to highest
+
+        // populate overlapData
+        i = 0;
+        let j = 0;
+        let k = 0;
+        while (tmpData[i]) {
+          j = 0;
+          while (tmpData[i][j]) {
+            k = 0;
+            while (allSystems[k]) {
+              if (allSystems[k] === tmpData[i][j].name) {
+                overlapData.push(tmpData[i][j]);
+              }
+              k++;
             }
-            console.log('reading local file');
-            i = 0; // reset for readStream split loop
-            let j = 0;
-            fs.createReadStream(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`)
-              .pipe(split(JSON.parse))
-              .on('data', (obj) => { // this iterates through every system
-                let overlapIndicator = 0;
-                let lastLead;
-                for (i = 0; i < sphereData.length; i++) { // iterate through spheres
-                  for (j = 0; j < sphereData[i].length; j++) { // iterate through systems
-                    if (obj.id === sphereData[i][j].id) { // if system matched eddb entry
-                      overlapIndicator++;
-                      // Account for exploited systems
-                      /* const exploitedSystem = {};
-                      for (i = 0; i < refSys.length; i++) {
-                        if (obj.name === refSys[i]) {
-                          grossCC += popToCC(obj.population);
-                          total--;
-                        } else if (obj.power_state === 'Exploited') { // If exploited system
-                          exploitedSystem.power = obj.power;
-                          exploitedSystem.cc = popToCC(obj.population);
-                          exploitedData.push(exploitedSystem);
-                          total--; // to be contested systems will not count towards triggers
-                        } else if (obj.power_state === 'Contested' || obj.power_state === 'Control') {
-                          total--; // contested systems do not count towards triggers
-                        } else {
-                          grossCC += popToCC(obj.population);
-                          if (obj.government === 'Corporate') {
-                            favorableSystems++;
-                          }
-                        }
-                      } */
-                      // Add data to object array
-                      sphereData[i][j].government = obj.government;
-                      // reorganize lead in the displayed order
-                      const tmp = sphereData[i][j].lead;
-                      delete sphereData[i][j].lead;
-                      sphereData[i][j].lead = tmp;
-                      sphereData[i][j].cc = popToCC(obj.population);
-                      sphereData[i][j].power = obj.power;
-                      sphereData[i][j].state = obj.power_state;
-                      lastLead = tmp;
-                    }
-                  }
-                }
-                if (overlapIndicator > 1) {
-                  const overlapSystem = {};
-                  overlapSystem.name = obj.name;
-                  overlapSystem.government = obj.government;
-                  overlapSystem.lead = lastLead;
-                  overlapSystem.cc = popToCC(obj.population);
-                  overlapSystem.power = obj.power;
-                  overlapSystem.state = obj.power_state;
-                  overlapData.push(overlapSystem);
-                  overlapTotalCC += popToCC(obj.population);
-                }
-              })
-              .on('close', () => { // acting as .then for createReadStream
-                // remove id from values so they can be columnified
-                i = 0;
-                while (sphereData[i]) {
-                  while (sphereData[j]) {
-                    delete sphereData[i][j].id;
-                    j++;
-                  }
-                  j = 0;
-                  i++;
-                } /*
-                // convert contested CC values into readable strings
-                // Sort by power alphabetically
-                exploitedData.sort((a, b) => {
-                  const nameA = a.power;
-                  const nameB = b.power;
-                  if (nameA < nameB) { return -1; }
-                  if (nameA > nameB) { return 1; }
-                  return 0;
-                });
-                // convert to readable string
-                let exploitedCCStr = '';
-                if (exploitedData.length !== 0) {
-                  let powerName = exploitedData[0].power; // set initial power
-                  exploitedCCStr = '\n';
-                  let exploitedCC = 0;
-                  for (i = 0; i < exploitedData.length; i++) { // Add CC by power
-                    if (powerName === exploitedData[i].power) {
-                      exploitedCC += exploitedData[i].cc;
-                    } else {
-                      exploitedCCStr = `${exploitedCCStr + exploitedCC}CC will be contested with ${powerName}\n`;
-                      powerName = exploitedData[i].power;
-                      exploitedCC = exploitedData[i].cc;
-                    }
-                  }
-                  exploitedCCStr = `${exploitedCCStr + exploitedCC}CC will be contested with ${powerName}\n`; // Needed for last iteration
-                } */
-                let refSysStr = '';
-                for (i = 0; i < refSys.length; i++) {
-                  refSysStr += `${refSys[i]}, `;
-                }
-                refSysStr = refSysStr.slice(0, -2);
-                const overlapColumns = columnify(overlapData); // tabularize info
-                message.channel.send(`\`\`\`ini\n[${refSysStr} Sphere Overlap Analysis]\n\n${overlapColumns}\n\`\`\``);
-                message.channel.send(`\`\`\`${overlapTotalCC} CC inside the overlap\n\`\`\``);
-                console.log('command done');
-              })
-              .on('error', (err) => {
-                console.log(err);
-              });
+            allSystems.push(tmpData[i][j].name);
+            j++;
+          }
+          i++;
+        }
+
+        // add data to overlapData
+        i = 0;
+        fs.createReadStream(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`)
+          .pipe(split(JSON.parse))
+          .on('data', (obj) => { // this iterates through every system
+            if (overlapData[i] != null) {
+              if (obj.id === overlapData[i].id) {
+                overlapData[i].CC = popToCC(obj.population);
+                overlapData[i].power = obj.power;
+                overlapData[i].state = obj.power_state;
+                i++;
+              }
+            }
           })
-          .catch((err) => {
-            console.log(`Promise problem: ${err.message}`);
-            message.channel.send('Something went wrong, likely elitebgs.app being difficult. Please try again, or if the problem persists, contact Cynder#7567');
+          .on('close', () => { // acting as .then for createReadStream
+            // properly capitalize input systems
+            // delete ids
+            i = 0;
+            const refSys = [];
+            while (overlapData[i]) {
+              j = 0;
+              while (inputs[j]) {
+                if ((overlapData[i].name).toLowerCase() === inputs[j].toLowerCase()) {
+                  refSys.push(overlapData[i].name);
+                }
+                j++;
+              }
+              delete overlapData[i].id;
+              i++;
+            }
+            let refSysStr = '';
+            for (i = 0; i < refSys.length; i++) {
+              refSysStr += `${refSys[i]}, `;
+            }
+            refSysStr = refSysStr.slice(0, -2);
+            const overlapColumns = columnify(overlapData); // tabularize info
+            message.channel.send(`\`\`\`ini\n[${refSysStr} Sphere Overlap Analysis]\n\n${overlapColumns}\n\`\`\``);
+            console.log('command done');
+          })
+          .on('error', (err) => {
+            console.log(err);
           });
-      })
-      .catch((err) => { console.log(`Fetch problem: ${err.message}`); });
+      });
   } else if (command === 'cc') {
     console.log('working on cc');
     message.channel.send('Calculating...');
@@ -1092,8 +971,16 @@ client.on('message', (message) => {
         console.log(err);
       });
   } else if (command === 'help') {
-    // help me I hate what I have wrought but it's the only way the formatting works ;-;
-    message.channel.send('```\nCurrent Version: 0.7.2\nAll data is as up-to-date as possible (via eddb), bot can receive dms. Dates shown are roughly auto-corrected to tick timings.\n\nCommands:\n~lead <system> takes a system and finds the inf% difference between the highest inf% faction, and the 2nd highest\n~sphere -<power (optional)> <system> designated a system as a control system, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead shows control ratios (only for Aisling currently for control). Example: ~sphere -Winters Mbambiva\n~tick shows the last tick time\n~multisphere <system 1> <system 2> ... <system i> shows all systems overlapped by the 15ly spheres of the input systems.\n~cc <power> shows the total cc and systems controlled by a power\n\nThe dates shown reflect when the leads were last updated; the Powerplay info is updated daily at 1am CST, via EDDB\n```');
+    // readability
+    const version = 'Current Version: 0.8.0';
+    const preamble = 'All data is as up-to-date as possible via eddb and elitebgs. Jibri can receive dms, and does not log data for any commands given. Dates shown are roughly autocorrected to the last tick time.\n\n';
+    const lead = '~lead <system> takes a system and finds the inf% difference between the controlling faction and the next highest\n';
+    const sphere = '~sphere <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a15ly sphere. If the target system is a control system, instead automatically shows control data. Example:~sphere Winters Mbambiva\n';
+    const multisphere = '~multisphere <system 1> <system 2> ... <system n> shows all systems overlapped by the 15ly spheres of the input systems.\n';
+    const tick = '~tick shows the last tick time\n';
+    const cc = '~cc <power> shows the total cc and systems controlled by a power\n';
+    const postamble = 'The dates shown reflect when the leads were last updated; the Powerplay info is updated daily at 2am CST, via EDDB\n';
+    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${lead}${sphere}${multisphere}${cc}${tick}\n ${postamble}\`\`\``);
   }
 });
 client.login(token);
