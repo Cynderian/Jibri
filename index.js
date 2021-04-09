@@ -19,6 +19,35 @@ let newTick = '';
 const today = new Date();
 const client = new Discord.Client(); // game start!
 
+function inputPowerFilter(message, input) {
+  if (input === 'Zachary' || input === 'Hudson') {
+    return 'Zachary Hudson';
+  // eslint-disable-next-line no-else-return
+  } else if (input === 'Felicia' || input === 'Winters') {
+    return 'Felicia Winters';
+  } else if (input === 'Arissa' || input === 'Lavigny-Duval') {
+    return 'Arissa Lavigny-Duval';
+  } else if (input === 'Edmund' || input === 'Mahon') {
+    return 'Edmund Mahon';
+  } else if (input === 'Archon' || input === 'Delaine') {
+    return 'Archon Delaine';
+  } else if (input === 'Denton' || input === 'Patreus') {
+    return 'Denton Patreus';
+  } else if (input === 'Yuri' || input === 'Grom') {
+    return 'Yuri Grom';
+  } else if (input === 'Li' || input === 'Yong-Rui' || input === 'LYR') {
+    return 'Li Yong-Rui';
+  } else if (input === 'Zemina' || input === 'Torval') {
+    return 'Zemina Torval';
+  } else if (input === 'Pranav' || input === 'Antal') {
+    return 'Pranav Antal';
+  } else if (input === 'Aisling' || input === 'Aisling Duval') {
+    return 'Aisling Duval';
+  } else {
+    return undefined;
+  }
+}
+
 function HQDistances(power, x, y, z) {
   let HQx;
   let HQy;
@@ -259,7 +288,7 @@ async function ebgsOrEddb(message, url, input) {
     }
     const ebgsPromises = [];
     for (let i = 1; i < json.pages + 1; i++) { // pages starts at 1
-      const delay = i * 500;
+      const delay = i * 200;
       const promise = new Promise((resolve) => setTimeout(resolve, delay)).then(() => fetch(`https://elitebgs.app/api/ebgs/v5/systems?sphere=true&factionDetails=true&referenceDistance=15&referenceSystem=${input}&page=${i}`));
       ebgsPromises.push(promise);
     }
@@ -408,46 +437,24 @@ client.on('message', (message) => {
     console.log('working on sphere');
     message.channel.send('Calculating...');
     let input = '';
-    let inputPower = 'Aisling Duval';
+    let inputPower;
     if (!args.length) { // take all input after sphere and designate it the target system
       return message.channel.send('Please define a reference system.');
     }
-    if (args[0].substring(0, 1) === '-') {
+    // Power name sanitization
+    if (args[0].substring(0, 1) === '-') { // Support for old format
       inputPower = capitalize(args[0].substring(1));
       args.shift();
     }
+    inputPower = inputPowerFilter(message, args[0]);
+    if (inputPower === undefined) {
+      inputPower = 'Aisling Duval'; // default
+    } else { args.shift(); }
+
     if (args.length > 1) {
       input = args[0]; // start at first argument to avoid an extra ' ' from for loop
       for (let i = 1; i < args.length; i++) { input = `${input} ${args[i]}`; }
     } else input = args[0];
-
-    // Power name sanitization
-    if (inputPower === 'Zachary' || inputPower === 'Hudson') {
-      inputPower = 'Zachary Hudson';
-    } else if (inputPower === 'Felicia' || inputPower === 'Winters') {
-      inputPower = 'Felicia Winters';
-    } else if (inputPower === 'Arissa' || inputPower === 'Lavigny-Duval') {
-      inputPower = 'Arissa Lavigny-Duval';
-    } else if (inputPower === 'Edmund' || inputPower === 'Mahon') {
-      inputPower = 'Edmund Mahon';
-    } else if (inputPower === 'Archon' || inputPower === 'Delaine') {
-      inputPower = 'Archon Delaine';
-    } else if (inputPower === 'Denton' || inputPower === 'Patreus') {
-      inputPower = 'Denton Patreus';
-    } else if (inputPower === 'Yuri' || inputPower === 'Grom') {
-      inputPower = 'Yuri Grom';
-    } else if (inputPower === 'Li' || inputPower === 'Yong-Rui' || inputPower === 'LYR') {
-      inputPower = 'Li Yong-Rui';
-    } else if (inputPower === 'Zemina' || inputPower === 'Torval') {
-      inputPower = 'Zemina Torval';
-    } else if (inputPower === 'Pranav' || inputPower === 'Antal') {
-      inputPower = 'Pranav Antal';
-    } else if (inputPower === 'Aisling' || inputPower === 'Aisling Duval') {
-      inputPower = 'Aisling Duval';
-    } else {
-      message.channel.send('Input power was not found; either it is not yet supported, or there may be a typo.');
-      return;
-    }
 
     // if systems are seperated with "", remove them for processing
     input = removeQuotes(input);
@@ -496,11 +503,14 @@ client.on('message', (message) => {
                   exploitedSystem.cc = popToCC(obj.population);
                   exploitedData.push(exploitedSystem);
                   // to be contested systems will not count towards triggers
+                  grossCC += popToCC(obj.population);
                 } else if (obj.power_state === 'Contested') {
                   netContestedCC += popToCC(obj.population);
                   // contested systems do not count towards triggers
+                  grossCC += popToCC(obj.population);
                 } else if (obj.power_state === 'Control') {
                   // control systems do not count towards triggers
+                  grossCC += popToCC(obj.population);
                 } else {
                   grossCC += popToCC(obj.population);
                 }
@@ -522,11 +532,6 @@ client.on('message', (message) => {
               delete systemData[i].id;
               i++;
             }
-            // math for cc calculations
-            const HQDistance = HQDistances(inputPower, refSysx, refSysy, refSysz);
-            const overhead = Math.ceil((Math.min(((11.5 * powerControlSys) / 42) ** 3, 5.4 * 11.5 * powerControlSys)) / powerControlSys);
-            const upkeep = Math.ceil((HQDistance ** 2) * 0.001 + 20);
-            const netCC = grossCC - overhead - upkeep;
             // convert contested CC values into readable strings
             // Sort by power alphabetically
             exploitedData.sort((a, b) => {
@@ -548,71 +553,132 @@ client.on('message', (message) => {
                   exploitedCC += exploitedData[i].cc;
                   netExploitedCC += exploitedData[i].cc;
                 } else {
-                  exploitedCCStr = `${exploitedCCStr + exploitedCC} CC will be contested with ${powerName}\n`;
+                  const tmp = powerName.split(' ');
+                  exploitedCCStr += `Contested with ${tmp[0]}: ${exploitedCC}CC\n`;
                   powerName = exploitedData[i].power;
                   exploitedCC = exploitedData[i].cc;
                 }
               }
-              exploitedCCStr = `${exploitedCCStr + exploitedCC} CC will be contested with ${powerName}\n`; // Needed for last iteration
+              const tmp = powerName.split(' ');
+              exploitedCCStr += `Contested with ${tmp[0]}: ${exploitedCC}CC\n`; // Needed for last iteration
             }
-
+            // math for cc calculations
+            const HQDistance = HQDistances(inputPower, refSysx, refSysy, refSysz);
+            const overhead = Math.ceil((Math.min(((11.5 * powerControlSys) / 42) ** 3, 5.4 * 11.5 * powerControlSys)) / powerControlSys);
+            const upkeep = Math.ceil((HQDistance ** 2) * 0.001 + 20);
+            let netCC = grossCC - overhead - upkeep - netExploitedCC - netContestedCC;
             // calculate favorable/neutral/unfavorable systems
             i = 0;
             while (systemData[i]) {
-              if (systemData[i].name === refSys) {
-                systemData.splice(i, 1);
-                i--;
-              } else if (refSysPowerState === 'Control' && refSysPower === 'Aisling Duval') {
-                if (systemData[i].state !== 'Contested') {
-                  if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
+              // highlights control system in list
+              if (systemData[i].name === refSys && refSysPowerState !== 'Control') {
+                // removes control system from list
+                // systemData.splice(i, 1);
+                // i--;
+              // autocorrect to reading controlled sphere state if sleected system is Control
+              } else if (refSysPowerState === 'Control') {
+                // Control Ethos
+                // Social
+                if (refSysPower === 'Aisling Duval' || refSysPower === 'Archon Delaine') {
+                  if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Control') {
+                    if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
                       || systemData[i].government === 'Confederacy') {
-                    favorableSystems++;
-                  } else if (systemData[i].government === 'Feudal' || systemData[i].government === 'Prison Colony'
+                      favorableSystems++;
+                    } else if (systemData[i].government === 'Feudal' || systemData[i].government === 'Prison Colony'
                       || systemData[i].government === 'Theocracy') {
-                    unfavorableSystems++;
-                  } else { // all others, aka if neutral
-                    neutralSystems++;
+                      unfavorableSystems++;
+                    } else { // all others, aka if neutral
+                      neutralSystems++;
+                    }
                   }
                 }
-                // expansion un/favorables
-              } else if (inputPower === 'Aisling Duval' || inputPower === 'Felicica Winters'
-                        || inputPower === 'Edward Mahon' || inputPower === 'Li Yong-Rui'
-                        || inputPower === 'Zemina Torval') {
-                if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
-                  && systemData[i].state !== 'Control') {
-                  if (systemData[i].government === 'Corporate') {
-                    favorableSystems++;
-                  } else if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
-                            || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
-                    unfavorableSystems++;
-                  } else { // all others, aka if neutral
-                    neutralSystems++;
+                // Combat
+                if (refSysPower === 'Arissa Lavigny-Duval' || refSysPower === 'Denton Patreus'
+                  || refSysPower === 'Zachary Hudson') {
+                  if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Control') {
+                    if (systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                      favorableSystems++;
+                    } else if (systemData[i].government === 'Dictatorship') {
+                      unfavorableSystems++;
+                    } else { // all others, aka if neutral
+                      neutralSystems++;
+                    }
                   }
                 }
-              } else if (inputPower === 'Zachary Hudson' || inputPower === 'Arissa Lavigny-Duval'
-                        || inputPower === 'Archon Delaine' || inputPower === 'Denton Patreus'
-                        || inputPower === 'Yuri Grom') {
-                if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
-                  && systemData[i].state !== 'Control') {
-                  if (systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
-                    favorableSystems++;
-                  } else if (systemData[i].government === 'Dictatorship') {
-                    unfavorableSystems++;
-                  } else { // all others, aka if neutral
-                    neutralSystems++;
+                // Finance
+                if (refSysPower === 'Edmund Mahon' || refSysPower === 'Felicia Winters'
+                  || refSysPower === 'Li Yong-Rui') {
+                  if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Control') {
+                    if (systemData[i].government === 'Corporate') {
+                      favorableSystems++;
+                    } else if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
+                    || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                      unfavorableSystems++;
+                    } else { // all others, aka if neutral
+                      neutralSystems++;
+                    }
                   }
                 }
-              } else if (inputPower === 'Pranav Antal') {
-                if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
-                  && systemData[i].state !== 'Control') {
-                  if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
-                    || systemData[i].government === 'Confederacy') {
-                    favorableSystems++;
-                  } else if (systemData[i].government === 'Feudal' || systemData[i].government === 'Prison Colony'
-                    || systemData[i].government === 'Theocracy') {
-                    unfavorableSystems++;
-                  } else { // all others, aka if neutral
-                    neutralSystems++;
+                // Covert
+                if (refSysPower === 'Pranav Antal' || refSysPower === 'Zemina Torval'
+                  || refSysPower === 'Yuri Grom') {
+                  if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Control') {
+                    if (systemData[i].government === 'Corporate') {
+                      favorableSystems++;
+                    } else if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
+                    || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                      unfavorableSystems++;
+                    } else { // all others, aka if neutral
+                      neutralSystems++;
+                    }
+                  }
+                }
+              } else {
+                // Expansion Ethos
+                // Social
+                if (inputPower === 'Pranav Antal') {
+                  if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
+                    && systemData[i].state !== 'Control') {
+                    if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
+                      || systemData[i].government === 'Confederacy') {
+                      favorableSystems++;
+                    } else if (systemData[i].government === 'Feudal' || systemData[i].government === 'Prison Colony'
+                      || systemData[i].government === 'Theocracy') {
+                      unfavorableSystems++;
+                    } else { // all others, aka if neutral
+                      neutralSystems++;
+                    }
+                  }
+                }
+                // Combat
+                if (inputPower === 'Zachary Hudson' || inputPower === 'Arissa Lavigny-Duval'
+                  || inputPower === 'Archon Delaine' || inputPower === 'Denton Patreus'
+                  || inputPower === 'Yuri Grom') {
+                  if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
+                    && systemData[i].state !== 'Control') {
+                    if (systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                      favorableSystems++;
+                    } else if (systemData[i].government === 'Dictatorship') {
+                      unfavorableSystems++;
+                    } else { // all others, aka if neutral
+                      neutralSystems++;
+                    }
+                  }
+                }
+                // Finance
+                if (inputPower === 'Aisling Duval' || inputPower === 'Felicia Winters'
+                  || inputPower === 'Edward Mahon' || inputPower === 'Li Yong-Rui'
+                  || inputPower === 'Zemina Torval') {
+                  if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
+                    && systemData[i].state !== 'Control') {
+                    if (systemData[i].government === 'Corporate') {
+                      favorableSystems++;
+                    } else if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
+                      || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                      unfavorableSystems++;
+                    } else { // all others, aka if neutral
+                      neutralSystems++;
+                    }
                   }
                 }
               }
@@ -652,6 +718,16 @@ client.on('message', (message) => {
               if (nameA > nameB) { return 1; }
               return 0;
             });
+            // puts target system at bottom
+            i = 0;
+            while (systemData[i]) {
+              if (refSys === systemData[i].name) {
+                systemData.push(systemData[i]);
+                systemData.splice(i, 1);
+                break;
+              }
+              i++;
+            }
 
             let columns = columnify(systemData); // tabularize info
             // In case of >2000 character message overflow
@@ -670,21 +746,24 @@ client.on('message', (message) => {
               overflowColumns = columns.substring(index);
               columns = columns.substring(0, index);
             }
-            // main text
-            message.channel.send(`\`\`\`ini\n[${refSys} Control Sphere Analysis]\n\n${columns}\n\`\`\``);
-            if (overflowColumns.length > 0) {
-              message.channel.send(`\`\`\`\n${overflowColumns}\n\`\`\``);
-            }
 
-            // footer
+            // footer setup
             let footerInfo = '';
-            let setType = 'expansion';
-            if (refSysPowerState === 'Control' && refSysPower === 'Aisling Duval') {
-              setType = 'control';
+            let setType = 'Expansion';
+            if (refSysPowerState === 'Control') {
+              setType = 'Control';
+              netCC += netExploitedCC + netContestedCC;
+              inputPower = refSysPower;
             } else {
               footerInfo = `${exploitedCCStr}`;
             }
-            message.channel.send(`\`\`\`\n${favorableSystems}/${neutralSystems}/${unfavorableSystems} favorable/neutral/unfavorable systems for ${inputPower} ${setType}\nSphere gross value: ${grossCC + netExploitedCC + netContestedCC}CC\n${footerInfo}Net CC gained: ${netCC.toFixed(0)}CC\n\`\`\``);
+
+            // output
+            message.channel.send(`\`\`\`ini\n[${refSys} ${setType} Sphere Analysis]\n\n${columns}\n\`\`\``);
+            if (overflowColumns.length > 0) {
+              message.channel.send(`\`\`\`\n${overflowColumns}\n\`\`\``);
+            }
+            message.channel.send(`\`\`\`\n${favorableSystems}/${neutralSystems}/${unfavorableSystems} favorable/neutral/unfavorable systems for ${inputPower}\nSphere gross value: ${grossCC}CC\n${footerInfo}Upkeep + Overhead: ${upkeep} + ${overhead}\nNet CC gained: ${netCC.toFixed(0)}CC\n\`\`\``);
 
             console.log('command done');
           })
@@ -701,7 +780,7 @@ client.on('message', (message) => {
           .setColor('#0055b3')
           .setURL('https://elitebgs.app/tick')
           .setDescription(`**Latest tick was at**
-          ${tick.getUTCHours()}:${tick.getUTCMinutes()} UTC, ${tick.toString().slice(4, 7)} ${tick.getUTCDate()}`)
+          ${tick.getHours()}:${tick.getMinutes()}, ${tick.toString().slice(4, 7)} ${tick.getDate()}`)
           // .setThumbnail('https://i.imgur.com/wSTFkRM.png')
           .setTimestamp();
 
@@ -950,23 +1029,21 @@ client.on('message', (message) => {
       for (let i = 1; i < args.length; i++) { input = `${input} ${args[i]}`; }
     } else input = args[0];
     // if input is seperated with "", remove them for processing
-    input = removeQuotes(input);
+    input = capitalize(removeQuotes(input));
+    input = inputPowerFilter(message, input);
+    if (input === undefined) {
+      return;
+    }
 
     const controlSystems = [];
     let cc = 0;
     let unique = 0;
-    let capitalizationFlag = 0;
-    let power = '';
     // grab all control systems for the power
     fs.createReadStream(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`)
       .pipe(split(JSON.parse))
       .on('data', (obj) => { // this iterates through every system
         if (obj.power !== null) {
-          if ((obj.power).toLowerCase() === input.toLowerCase() && capitalizationFlag === 0) { // properly capitalize input
-            power = obj.power;
-            capitalizationFlag++;
-          }
-          if (obj.power === power && obj.power_state === 'Control') {
+          if (obj.power === input && obj.power_state === 'Control') {
             cc += popToCC(obj.population);
             unique++;
             const controlSystem = {};
@@ -987,7 +1064,6 @@ client.on('message', (message) => {
             if (sys.population > 0) {
               for (let i = 0; i < controlSystems.length; i++) {
                 if (distLessThan(15, controlSystems[i].x, controlSystems[i].y, controlSystems[i].z, sys.x, sys.y, sys.z) === true && sys.power_state !== 'Contested' && sys.power_state !== 'Control') { // if system is within sphere of control system
-                  console.log(`Ref: ${controlSystems[i].name}`);
                   let counted = 0;
                   for (let j = 0; j < countedSystems.length; j++) {
                     if (sys.name === countedSystems[j]) {
@@ -998,7 +1074,6 @@ client.on('message', (message) => {
                     cc += popToCC(sys.population);
                     countedSystems.push(sys.name);
                     unique++;
-                    console.log(`${sys.name}, ${sys.power_state}, ${popToCC(sys.population)} CC`);
                   }
                 }
               }
@@ -1006,7 +1081,7 @@ client.on('message', (message) => {
           })
           .on('close', () => {
             if (cc !== 0) {
-              message.channel.send(`${power} has a sum of ${cc} CC across ${unique} systems.`);
+              message.channel.send(`${input} has a sum of ${cc} CC across ${unique} systems.`);
             } else { message.channel.send('Something went wrong. Was there a typo?'); }
           })
           .on('error', (err) => {
@@ -1017,17 +1092,8 @@ client.on('message', (message) => {
         console.log(err);
       });
   } else if (command === 'help') {
-    message.channel.send(`\`\`\`Current Version: 0.7.2
-    All data is as up-to-date as possible (via eddb), bot can receive dms. Dates shown are roughly auto-corrected to tick timings.
-    
-    Commands:
-    ~lead <system> takes a system and finds the inf% difference between the highest inf% faction, and the 2nd highest
-    ~sphere -<power (optional)> <system> designated a system as a control system, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead shows control ratios (only for Aisling currently for control). Example: ~sphere -Winters Mbambiva
-    ~tick shows the last tick time
-    ~multisphere <system 1> <system 2> ... <system i> shows all systems overlapped by the 15ly spheres of the input systems.
-    ~cc <power> shows the total cc and systems controlled by a power
-    
-    The dates shown reflect when the leads were last updated; the Powerplay info is updated daily at 1am CST, via EDDB\n\`\`\``);
+    // help me I hate what I have wrought but it's the only way the formatting works ;-;
+    message.channel.send('```\nCurrent Version: 0.7.2\nAll data is as up-to-date as possible (via eddb), bot can receive dms. Dates shown are roughly auto-corrected to tick timings.\n\nCommands:\n~lead <system> takes a system and finds the inf% difference between the highest inf% faction, and the 2nd highest\n~sphere -<power (optional)> <system> designated a system as a control system, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead shows control ratios (only for Aisling currently for control). Example: ~sphere -Winters Mbambiva\n~tick shows the last tick time\n~multisphere <system 1> <system 2> ... <system i> shows all systems overlapped by the 15ly spheres of the input systems.\n~cc <power> shows the total cc and systems controlled by a power\n\nThe dates shown reflect when the leads were last updated; the Powerplay info is updated daily at 1am CST, via EDDB\n```');
   }
 });
 client.login(token);
