@@ -5,7 +5,6 @@
 /* eslint-disable prefer-destructuring */
 /* eslint-disable no-console */
 /* eslint-disable no-plusplus */
-// eslint-disable-next-line no-unused-vars
 const request = require('request');
 const { exec } = require('child_process');
 const fetch = require('node-fetch');
@@ -20,29 +19,30 @@ const today = new Date();
 const client = new Discord.Client(); // game start!
 
 function inputPowerFilter(message, input) {
-  const casedInput = input.charAt(0).toUpperCase() + input.slice(1);
-  if (casedInput === 'Zachary' || casedInput === 'Hudson') {
+  let casedInput = input.charAt(0).toUpperCase() + input.slice(1);
+  casedInput = input.toLowerCase();
+  if (casedInput === 'zachary' || casedInput === 'hudson') {
     return 'Zachary Hudson';
   // eslint-disable-next-line no-else-return
-  } else if (casedInput === 'Felicia' || casedInput === 'Winters' || casedInput === 'Winter') {
+  } else if (casedInput === 'felicia' || casedInput === 'winters' || casedInput === 'winter') {
     return 'Felicia Winters';
-  } else if (casedInput === 'Arissa' || casedInput === 'Lavigny-Duval' || casedInput === 'ALD') {
+  } else if (casedInput === 'arissa' || casedInput === 'lavigny-duval' || casedInput === 'ald') {
     return 'Arissa Lavigny-Duval';
-  } else if (casedInput === 'Edmund' || casedInput === 'Mahon') {
+  } else if (casedInput === 'edmund' || casedInput === 'mahon') {
     return 'Edmund Mahon';
-  } else if (casedInput === 'Archon' || casedInput === 'Delaine') {
+  } else if (casedInput === 'archon' || casedInput === 'delaine') {
     return 'Archon Delaine';
-  } else if (casedInput === 'Denton' || casedInput === 'Patreus') {
+  } else if (casedInput === 'denton' || casedInput === 'patreus') {
     return 'Denton Patreus';
-  } else if (casedInput === 'Yuri' || casedInput === 'Grom') {
+  } else if (casedInput === 'yuri' || casedInput === 'grom') {
     return 'Yuri Grom';
-  } else if (casedInput === 'Li' || casedInput === 'Yong-Rui' || casedInput === 'LYR') {
+  } else if (casedInput === 'li' || casedInput === 'yong-rui' || casedInput === 'lyr') {
     return 'Li Yong-Rui';
-  } else if (casedInput === 'Zemina' || casedInput === 'Torval') {
+  } else if (casedInput === 'zemina' || casedInput === 'torval') {
     return 'Zemina Torval';
-  } else if (casedInput === 'Pranav' || casedInput === 'Antal') {
+  } else if (casedInput === 'rranav' || casedInput === 'antal') {
     return 'Pranav Antal';
-  } else if (casedInput === 'Aisling' || casedInput === 'Aisling Duval') {
+  } else if (casedInput === 'aisling' || casedInput === 'aisling duval') {
     return 'Aisling Duval';
   } else {
     return undefined;
@@ -440,19 +440,22 @@ client.on('message', (message) => {
     }
     // Power name sanitization
     if (args[0].substring(0, 1) === '-') { // Support for old format
-      inputPower = capitalize(args[0].substring(1));
+      inputPower = inputPowerFilter(message, args[0].substring(1));
       args.shift();
+    } else {
+      inputPower = inputPowerFilter(message, args[0]);
+      if (inputPower === undefined) {
+        inputPower = 'Aisling Duval'; // default
+      } else { args.shift(); }
     }
-    inputPower = inputPowerFilter(message, args[0]);
-    if (inputPower === undefined) {
-      inputPower = 'Aisling Duval'; // default
-    } else { args.shift(); }
-
-    if (args.length > 1) {
-      input = args[0]; // start at first argument to avoid an extra ' ' from for loop
-      for (let i = 1; i < args.length; i++) { input = `${input} ${args[i]}`; }
-    } else input = args[0];
-
+    if (args[0]) {
+      if (args.length > 1) {
+        input = args[0]; // start at first argument to avoid an extra ' ' from for loop
+        for (let i = 1; i < args.length; i++) { input = `${input} ${args[i]}`; }
+      } else input = args[0];
+    } else {
+      return message.channel.send('Please define a reference system.');
+    }
     // if systems are seperated with "", remove them for processing
     input = removeQuotes(input);
 
@@ -580,7 +583,7 @@ client.on('message', (message) => {
                   overhead = (Math.min(((11.5 * (powerControlSys)) / 42) ** 3, 5.4 * 11.5 * powerControlSys)) / powerControlSys;
                 } else {
                   // powerControlSys + 1 is due to the additional system added via the expansion itself
-                  overhead = (Math.min(((11.5 * (powerControlSys + 1)) / 42) ** 3, 5.4 * 11.5 * powerControlSys)) / powerControlSys;
+                  overhead = (Math.min(((11.5 * (powerControlSys + 1)) / 42) ** 3, 5.4 * 11.5 * (powerControlSys + 1))) / (powerControlSys + 1);
                 }
                 const overheadMax = (Math.min(((11.5 * (55)) / 42) ** 3, 5.4 * 11.5 * 55)) / 55;
                 const upkeep = Math.ceil((HQDistance ** 2) * 0.001 + 20);
@@ -643,10 +646,10 @@ client.on('message', (message) => {
                     if (refSysPower === 'Pranav Antal' || refSysPower === 'Zemina Torval'
                   || refSysPower === 'Yuri Grom') {
                       if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Control') {
-                        if (systemData[i].government === 'Corporate') {
+                        if (systemData[i].government === 'Feudal' || systemData[i].government === 'Communism'
+                          || systemData[i].government === 'Dictatorship' || systemData[i].government === 'Cooperative') {
                           favorableSystems++;
-                        } else if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
-                    || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                        } else if (systemData[i].government === 'Democracy') {
                           unfavorableSystems++;
                         } else { // all others, aka if neutral
                           neutralSystems++;
@@ -687,7 +690,7 @@ client.on('message', (message) => {
                     }
                     // Finance
                     if (inputPower === 'Aisling Duval' || inputPower === 'Felicia Winters'
-                  || inputPower === 'Edward Mahon' || inputPower === 'Li Yong-Rui'
+                  || inputPower === 'Edmund Mahon' || inputPower === 'Li Yong-Rui'
                   || inputPower === 'Zemina Torval') {
                       if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
                     && systemData[i].state !== 'Control') {
@@ -770,11 +773,23 @@ client.on('message', (message) => {
                 // footer setup
                 let footerInfo = '';
                 let setType = 'Expansion';
+                let expFort = 0;
+                let umOpp = 0;
+                let oppOrFortInfo = '';
                 if (refSysPowerState === 'Control') {
                   setType = 'Control';
-                  netCC += netExploitedCC + netContestedCC;
-                  netCCMax += netExploitedCC + netContestedCC;
+                  netCC += netExploitedCC;
+                  netCCMax += netExploitedCC;
                   inputPower = refSysPower;
+                  if (favorableSystems > neutralSystems && favorableSystems > unfavorableSystems) {
+                    expFort = Math.round(0.5 * (0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5)); // favorable fort trigger
+                  } else if (unfavorableSystems > neutralSystems && unfavorableSystems > favorableSystems) {
+                    expFort = Math.round(1.5 * (0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5)); // unfavorable fort trigger
+                  } else {
+                    expFort = Math.round(0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5); // neutral fort trigger
+                  }
+                  umOpp = Math.round(2750000 / (HQDistance ** 1.5) + 5000); // opposition trigger
+                  oppOrFortInfo = `${expFort} to fortify, ${umOpp} to undermine`;
                 } else {
                   footerInfo = `${exploitedCCStr}`;
                 }
@@ -794,7 +809,7 @@ client.on('message', (message) => {
                 }
 
                 // output
-                message.channel.send(`\`\`\`ini\n[${refSys} ${setType} Sphere Analysis]\n${warningStr}\n${columns}\n\`\`\``);
+                message.channel.send(`\`\`\`ini\n[${refSys} ${setType} Sphere Analysis] ${oppOrFortInfo}\n${warningStr}\n${columns}\n\`\`\``);
                 if (overflowColumns.length > 0) {
                   message.channel.send(`\`\`\`\n${overflowColumns}\n\`\`\``);
                 }
@@ -1025,7 +1040,7 @@ client.on('message', (message) => {
       });
   } else if (command === 'help') {
     // readability
-    const version = 'Current Version: 0.8.2';
+    const version = 'Current Version: 0.8.3';
     const preamble = 'All data is as up-to-date as possible via eddb and elitebgs. Jibri can receive dms, and does not log data for any commands given. The default power is Aisling.\n\n';
     const lead = '~lead <system> takes a system and finds the inf% difference between the controlling faction and the next highest\n';
     const sphere = '~sphere <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a15ly sphere. If the target system is a control system, instead automatically shows control data. Example: ~sphere Winters Mbambiva\n';
