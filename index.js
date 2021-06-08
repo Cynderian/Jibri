@@ -15,7 +15,6 @@ const Discord = require('discord.js');
 const { prefix, token } = require('./config.json');
 
 let newTick = '';
-const today = new Date();
 const client = new Discord.Client(); // game start!
 
 function inputPowerFilter(message, input) {
@@ -202,7 +201,7 @@ function eddbBackup(message, input) {
   let inputX;
   let inputY;
   let inputZ;
-  const data = fs.readFileSync(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.json`, 'utf8');
+  const data = fs.readFileSync('systems_populated.json', 'utf8');
   let i = 0;
   const obj = JSON.parse(data);
 
@@ -350,23 +349,30 @@ function mirrorEddb() {
         .on('close', callback);
     });
   };
+
   const urlOne = 'https://eddb.io/archive/v6/systems_populated.jsonl';
   const urlTwo = 'https://eddb.io/archive/v6/systems_populated.json';
+  const urlThree = 'https://eddb.io/archive/v6/stations.json';
   // save file as data for day before
-  const pathOne = `systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`;
-  const pathTwo = `systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.json`;
+  const pathOne = 'systems_populated.jsonl';
+  const pathTwo = 'systems_populated.json';
+  const pathThree = 'stations.json';
   download(urlOne, pathOne, () => {
-    exec(`truncate -s -1 systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`, (error) => {
+    exec('truncate -s -1 systems_populated.jsonl', (error) => {
       if (error !== null) {
         console.log(`exec error: ${error}`);
       }
     });
     const now = new Date();
-    console.log(`EDDB jsonl mirrored at ${now}`);
+    console.log(`EDDB populated systems jsonl mirrored at ${now}`);
   });
   download(urlTwo, pathTwo, () => {
     const now = new Date();
-    console.log(`EDDB json mirrored at ${now}`);
+    console.log(`EDDB populated systems json mirrored at ${now}`);
+  });
+  download(urlThree, pathThree, () => {
+    const now = new Date();
+    console.log(`EDDB station json mirrored at ${now}`);
   });
 }
 
@@ -414,7 +420,7 @@ client.on('message', (message) => {
   if (command === 'lead') {
     console.log('working on lead...');
     let input = '';
-    if (!args.length) { // take all input after sphere and designate it the target system
+    if (!args.length) { // take all input after command and designate it the target system
       return message.channel.send('Please define a reference system.');
     } if (args.length > 1) {
       input = args[0];
@@ -484,7 +490,7 @@ client.on('message', (message) => {
         let refSysPower = '';
         let refSysPowerState = '';
         console.log('reading local file');
-        fs.createReadStream(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`)
+        fs.createReadStream('systems_populated.jsonl')
           .pipe(split(JSON.parse))
           .on('data', (obj) => { // this iterates through every system
             if ((obj.name).toLowerCase() === input.toLowerCase()) {
@@ -498,14 +504,14 @@ client.on('message', (message) => {
           })
           .on('close', () => {
             i = 0;
-            fs.createReadStream(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`)
+            fs.createReadStream('systems_populated.jsonl')
               .pipe(split(JSON.parse))
               .on('data', (obj) => { // this iterates through every system
                 if (systemData[i] != null) {
                   if (obj.id === systemData[i].id) {
                     // Account for exploited systems
                     const exploitedSystem = {};
-                    if ((obj.name).toLowerCase() === input.toLowerCase()) {
+                    if ((obj.name).toLowerCase() === input.toLowerCase()) { // (to be) control system
                       grossCC += popToCC(obj.population);
                       refSysx = obj.x;
                       refSysy = obj.y;
@@ -523,7 +529,7 @@ client.on('message', (message) => {
                     } else if (obj.power_state === 'Control') {
                       // control systems do not count towards triggers
                       grossCC += popToCC(obj.population);
-                    } else {
+                    } else { // Expansion systems
                       grossCC += popToCC(obj.population);
                     }
 
@@ -781,18 +787,20 @@ client.on('message', (message) => {
                   netCC += netExploitedCC;
                   netCCMax += netExploitedCC;
                   inputPower = refSysPower;
-                  if (favorableSystems > neutralSystems && favorableSystems > unfavorableSystems) {
-                    expFort = Math.round(0.5 * (0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5)); // favorable fort trigger
-                  } else if (unfavorableSystems > neutralSystems && unfavorableSystems > favorableSystems) {
-                    expFort = Math.round(1.5 * (0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5)); // unfavorable fort trigger
-                  } else {
-                    expFort = Math.round(0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5); // neutral fort trigger
-                  }
-                  umOpp = Math.round(2750000 / (HQDistance ** 1.5) + 5000); // opposition trigger
-                  oppOrFortInfo = `${expFort} to fortify, ${umOpp} to undermine`;
                 } else {
                   footerInfo = `${exploitedCCStr}`;
                 }
+
+                // fortification / undermining / expansion triggers
+                if (favorableSystems > neutralSystems && favorableSystems > unfavorableSystems) {
+                  expFort = Math.round(0.5 * (0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5)); // favorable fort trigger
+                } else if (unfavorableSystems > neutralSystems && unfavorableSystems > favorableSystems) {
+                  expFort = Math.round(1.5 * (0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5)); // unfavorable fort trigger
+                } else {
+                  expFort = Math.round(0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5); // neutral fort trigger
+                }
+                umOpp = Math.round(2750000 / (HQDistance ** 1.5) + 5000); // opposition trigger
+                oppOrFortInfo = `${expFort} to fortify, ${umOpp} to undermine`;
 
                 // add max overhead if power is not at max already
                 let maxOverheadStr = `/ ${netCCMax.toFixed(1)}CC at max overhead`;
@@ -813,6 +821,7 @@ client.on('message', (message) => {
                 if (overflowColumns.length > 0) {
                   message.channel.send(`\`\`\`\n${overflowColumns}\n\`\`\``);
                 }
+                // footer
                 message.channel.send(`\`\`\`\n${favorableSystems}/${neutralSystems}/${unfavorableSystems} favorable/neutral/unfavorable systems for ${inputPower}\nSphere gross value: ${grossCC}CC\n${footerInfo}Upkeep + Overhead: ${upkeep} + ${overhead.toFixed(1)}\nNet CC gained: ${netCC.toFixed(1)}CC ${maxOverheadStr}\n\`\`\``);
 
                 console.log('command done');
@@ -923,7 +932,7 @@ client.on('message', (message) => {
 
         // add data to overlapData
         i = 0;
-        fs.createReadStream(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`)
+        fs.createReadStream('systems_populated.jsonl')
           .pipe(split(JSON.parse))
           .on('data', (obj) => { // this iterates through every system
             if (overlapData[i] != null) {
@@ -986,7 +995,7 @@ client.on('message', (message) => {
     let cc = 0;
     let unique = 0;
     // grab all control systems for the power
-    fs.createReadStream(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`)
+    fs.createReadStream('systems_populated.jsonl')
       .pipe(split(JSON.parse))
       .on('data', (obj) => { // this iterates through every system
         if (obj.power !== null) {
@@ -1005,7 +1014,7 @@ client.on('message', (message) => {
       .on('close', () => {
         const countedSystems = [];
         // grab all unique exploited systems for the power
-        fs.createReadStream(`systems_populated_${today.getMonth() + 1}_${today.getDate() - 1}_${today.getFullYear()}.jsonl`)
+        fs.createReadStream('systems_populated.jsonl')
           .pipe(split(JSON.parse))
           .on('data', (sys) => { // this iterates through every system
             if (sys.population > 0) {
@@ -1038,17 +1047,344 @@ client.on('message', (message) => {
       .on('error', (err) => {
         console.log(err);
       });
+  } else if (command === 'threats') {
+    console.log('working on threats');
+    message.channel.send('Calculating...');
+    let input = '';
+    if (!args.length) { // take all input after command and designate it the target power
+      return message.channel.send('Please define a first reference power.');
+    }
+    input = args[0]; // start at first argument to avoid an extra ' ' from for loop
+    input = capitalize(removeQuotes(input)); // if input is seperated with "", remove them for processing
+    input = inputPowerFilter(message, input);
+    if (input === undefined) {
+      return message.channel.send('Error reading first power name, please try again');
+    }
+    if (!args[1]) { // take all input after command and designate it the target power
+      return message.channel.send('Please define a second reference power.');
+    }
+    let threatPower = '';
+    threatPower = args[1]; // start at first argument to avoid an extra ' ' from for loop
+    threatPower = capitalize(removeQuotes(threatPower)); // if input is seperated with "", remove them for processing
+    threatPower = inputPowerFilter(message, threatPower);
+    if (threatPower === undefined) {
+      return message.channel.send('Error reading second power name, please try again');
+    }
+    // distance input
+    if (!args[2]) {
+      return message.channel.send('Please provide a reference distance');
+    }
+    const distance = Number(args[2], 10);
+    if (Number.isNaN(distance)) {
+      return message.channel.send('Please input a whole number for distance');
+    }
+
+    const controlSystems = [];
+    const allSystems = [];
+    let threatControlSystems = 0;
+    let obj = fs.readFileSync('systems_populated.json', 'utf8');
+    const refSys = JSON.parse(obj);
+    // grab all friendly power control systems
+    for (let i = 0; i < refSys.length; i++) {
+      if (refSys[i].power === input && refSys[i].power_state === 'Control') {
+        const controlSystem = {};
+        controlSystem.name = refSys[i].name;
+        controlSystem.x = refSys[i].x;
+        controlSystem.y = refSys[i].y;
+        controlSystem.z = refSys[i].z;
+        controlSystems.push(controlSystem);
+      }
+      if (refSys.power === threatPower && refSys.power_state === 'Control') {
+        threatControlSystems++;
+      }
+    }
+    console.log('control systems fetched');
+    // find all systems within the input range
+    for (let i = 0; i < refSys.length; i++) {
+      // console.log('x');
+      if (refSys[i].population > 0 && refSys[i].power === null
+          && refSys[i].name !== 'Shinrarta Dezhra' // you know where this is
+          && refSys[i].name !== 'Azoth' // 10 starter systems
+          && refSys[i].name !== 'Dromi'
+          && refSys[i].name !== 'Lia Fall'
+          && refSys[i].name !== 'Matet'
+          && refSys[i].name !== 'Orna'
+          && refSys[i].name !== 'Otegine'
+          && refSys[i].name !== 'Sharur'
+          && refSys[i].name !== 'Tarnkappe'
+          && refSys[i].name !== 'Tyet'
+          && refSys[i].name !== 'Wolfsegen') {
+        for (let j = 0; j < controlSystems.length; j++) {
+          if (distLessThan(distance, refSys[i].x, refSys[i].y, refSys[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z) === true
+            && refSys[i].power === null && refSys[i].power_state !== 'Contested') {
+            const system = {};
+            system.name = refSys[i].name;
+            system.id = refSys[i].id;
+            system.power = refSys[i].power;
+            system.x = refSys[i].x;
+            system.y = refSys[i].y;
+            system.z = refSys[i].z;
+            allSystems.push(system);
+          }
+        }
+      }
+    }
+    console.log('potential systems found');
+    obj = fs.readFileSync('stations.json', 'utf8');
+    const data = JSON.parse(obj);
+    const threatSystems = [];
+    // filter out all systems without a large port && with a port >1kls out
+    for (let i = 0; i < data.length; i++) {
+      for (let j = 0; j < allSystems.length; j++) {
+        // same system & large station & <1kls from star % no power
+        if (data[i].system_id === allSystems[j].id && data[i].max_landing_pad_size === 'L' && data[i].distance_to_star <= 1000) {
+          // filter out all repeated from being added
+          let exists = 0;
+          for (let k = 0; k < threatSystems.length; k++) {
+            if (threatSystems[k].name === allSystems[j].name) {
+              exists++;
+            }
+          }
+          if (exists === 0) {
+            const threatSystem = {};
+            threatSystem.name = allSystems[j].name;
+            threatSystem.x = allSystems[j].x;
+            threatSystem.y = allSystems[j].y;
+            threatSystem.z = allSystems[j].z;
+            threatSystems.push(threatSystem);
+          }
+        }
+      }
+    }
+    console.log('potential systems vetted for starports within 1kls');
+    // find 15ly sphere of all potential systems
+    // add net and contested CC to threatSystem objects
+    for (let i = 0; i < threatSystems.length; i++) {
+      let netCC = 0;
+      let contestedCC = 0;
+      let favorableSystems = 0;
+      let neutralSystems = 0;
+      let unfavorableSystems = 0;
+      for (let j = 0; j < refSys.length; j++) {
+        if (refSys[j].population > 0
+            && distLessThan(15, refSys[j].x, refSys[j].y, refSys[j].z, threatSystems[i].x, threatSystems[i].y, threatSystems[i].z) === true // 15ly sphere
+            && refSys[j].name !== 'Shinrarta Dezhra' // you know where this is
+            && refSys[j].name !== 'Azoth' // 10 starter systems
+            && refSys[j].name !== 'Dromi'
+            && refSys[j].name !== 'Lia Fall'
+            && refSys[j].name !== 'Matet'
+            && refSys[j].name !== 'Orna'
+            && refSys[j].name !== 'Otegine'
+            && refSys[j].name !== 'Sharur'
+            && refSys[j].name !== 'Tarnkappe'
+            && refSys[j].name !== 'Tyet'
+            && refSys[j].name !== 'Wolfsegen') {
+          if (refSys[j].power_state === null) { // to be control/exploited
+            netCC += popToCC(refSys[j].population);
+            // Expansion Ethos
+            // Social
+            if (threatPower === 'Pranav Antal') {
+              if (refSys[j].state !== 'Contested' && refSys[j].state !== 'Exploited'
+                && refSys[j].state !== 'Control') {
+                if (refSys[j].government === 'Communism' || refSys[j].government === 'Cooperative'
+                  || refSys[j].government === 'Confederacy') {
+                  favorableSystems++;
+                } else if (refSys[j].government === 'Feudal' || refSys[j].government === 'Prison Colony'
+                  || refSys[j].government === 'Theocracy') {
+                  unfavorableSystems++;
+                } else { // all others, aka if neutral
+                  neutralSystems++;
+                }
+              }
+            }
+            // Combat
+            if (threatPower === 'Zachary Hudson' || threatPower === 'Arissa Lavigny-Duval'
+              || threatPower === 'Archon Delaine' || threatPower === 'Denton Patreus'
+              || threatPower === 'Yuri Grom') {
+              if (refSys[j].state !== 'Contested' && refSys[j].state !== 'Exploited'
+                && refSys[j].state !== 'Control') {
+                if (refSys[j].government === 'Feudal' || refSys[j].government === 'Patronage') {
+                  favorableSystems++;
+                } else if (refSys[j].government === 'Dictatorship') {
+                  unfavorableSystems++;
+                } else { // all others, aka if neutral
+                  neutralSystems++;
+                }
+              }
+            }
+            // Finance
+            if (threatPower === 'Aisling Duval' || threatPower === 'Felicia Winters'
+              || threatPower === 'Edmund Mahon' || threatPower === 'Li Yong-Rui'
+              || threatPower === 'Zemina Torval') {
+              if (refSys[j].state !== 'Contested' && refSys[j].state !== 'Exploited'
+                && refSys[j].state !== 'Control') {
+                if (refSys[j].government === 'Corporate') {
+                  favorableSystems++;
+                } else if (refSys[j].government === 'Communism' || refSys[j].government === 'Cooperative'
+                  || refSys[j].government === 'Feudal' || refSys[j].government === 'Patronage') {
+                  unfavorableSystems++;
+                } else { // all others, aka if neutral
+                  neutralSystems++;
+                }
+              }
+            }
+          }
+          if (refSys[j].power_state === 'Exploited' && refSys[j].power === input) { // to be contested
+            contestedCC += popToCC(refSys[j].population);
+          }
+        }
+        // fortification / undermining / expansion triggers
+        let expFort = 0;
+        const HQDistance = HQDistances(threatPower, threatSystems[i].x, threatSystems[i].y, threatSystems[i].z);
+        /* if (favorableSystems > neutralSystems && favorableSystems > unfavorableSystems) {
+          expFort = Math.round(0.5 * (0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5)); // favorable fort trigger
+        } else if (unfavorableSystems > neutralSystems && unfavorableSystems > favorableSystems) {
+          expFort = Math.round(1.5 * (0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5)); // unfavorable fort trigger
+        } else { */
+        expFort = Math.round(0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5); // neutral fort trigger
+        // }
+        const umOpp = Math.round(2750000 / (HQDistance ** 1.5) + 5000); // opposition trigger
+        threatSystems[i].trigger = Math.round(100 * (expFort / umOpp)) / 100; // ratio
+      }
+      const powerControlSys = threatControlSystems;
+      const HQDistance = HQDistances(threatPower, threatSystems[i].x, threatSystems[i].y, threatSystems[i].z);
+      const overhead = Math.round((Math.min(((11.5 * (powerControlSys + 1)) / 42) ** 3, 5.4 * 11.5 * (powerControlSys + 1))) / (powerControlSys + 1));
+      const overheadMax = 62;
+      const upkeep = Math.ceil((HQDistance ** 2) * 0.001 + 20);
+      const worstNetCC = netCC - upkeep - overheadMax;
+      netCC = netCC - upkeep - overhead;
+      // threatSystems[i].net_CC = `${netCC} / ${worstNetCC}`;
+      threatSystems[i].net_CC = worstNetCC;
+      threatSystems[i].contested_CC = contestedCC;
+    }
+
+    // remove x y z needed for data
+    for (let i = 0; i < threatSystems.length; i++) {
+      delete threatSystems[i].x;
+      delete threatSystems[i].y;
+      delete threatSystems[i].z;
+    }
+
+    // sorts
+    threatSystems.sort((a, b) => b.net_CC - a.net_CC); // sorts systems by net CC
+    threatSystems.sort((a, b) => b.contested_CC - a.contested_CC); // sorts systems by contested CC
+
+    const columns = columnify(threatSystems); // tabularize info
+    // In case of >2000 character message overflow (basically guaranteed)
+    let index = 0;
+    let i = 0;
+    while (columns.indexOf('\n', 1900 * (i + 1)) !== -1) {
+      const block = columns.substring(index, columns.indexOf('\n', 1900 * (i + 1)));
+      index = columns.indexOf('\n', 1900 * (i + 1));
+      message.channel.send(`\`\`\`ini\n${block}\n\`\`\``);
+      i++;
+      i = 100; // temporary manual override so it only prints 1 block
+    }
+
+    // mem usage
+    const used = process.memoryUsage().heapUsed / 1024 / 1024;
+    console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
+  } else if (command === 'profitables') {
+    fs.createReadStream('systems_populated.jsonl')
+      .pipe(split(JSON.parse))
+      .on('data', (refSys) => { // this iterates through every system
+        if (refSys.population > 0 && refSys.power == null
+          && refSys.name !== 'Shinrarta Dezhra' // you know where this is
+          && refSys.name !== 'Azoth' // 10 starter systems
+          && refSys.name !== 'Dromi'
+          && refSys.name !== 'Lia Fall'
+          && refSys.name !== 'Matet'
+          && refSys.name !== 'Orna'
+          && refSys.name !== 'Otegine'
+          && refSys.name !== 'Sharur'
+          && refSys.name !== 'Tarnkappe'
+          && refSys.name !== 'Tyet'
+          && refSys.name !== 'Wolfsegen') {
+          // find sphere of system
+          const systemData = [];
+          let inputX;
+          let inputY;
+          let inputZ;
+          const data = fs.readFileSync('systems_populated.json', 'utf8');
+          let i = 0;
+          const obj = JSON.parse(data);
+          const input = refSys.name;
+          while (obj[i]) {
+            if (obj[i].population > 0) {
+              if (input.toLowerCase() === (obj[i].name).toLowerCase()) {
+                inputX = obj[i].x;
+                inputY = obj[i].y;
+                inputZ = obj[i].z;
+              }
+            }
+            i = 0;
+            while (obj[i]) {
+              if (distLessThan(15, inputX, inputY, inputZ, obj[i].x, obj[i].y, obj[i].z) === true
+                && obj[i].name !== 'Shinrarta Dezhra' // you know where this is
+                && obj[i].name !== 'Azoth' // 10 starter systems
+                && obj[i].name !== 'Dromi'
+                && obj[i].name !== 'Lia Fall'
+                && obj[i].name !== 'Matet'
+                && obj[i].name !== 'Orna'
+                && obj[i].name !== 'Otegine'
+                && obj[i].name !== 'Sharur'
+                && obj[i].name !== 'Tarnkappe'
+                && obj[i].name !== 'Tyet'
+                && obj[i].name !== 'Wolfsegen') {
+                // inf math alternative for eddb json
+                let j = 0;
+                let controllingInf;
+                let secondInf;
+                const infs = [];
+                while (obj[i].minor_faction_presences[j]) {
+                  if (obj[i].controlling_minor_faction_id === obj[i].minor_faction_presences[j].minor_faction_id) {
+                    controllingInf = obj[i].minor_faction_presences[j].influence;
+                  }
+                  infs.push(obj[i].minor_faction_presences[j].influence);
+                  j++;
+                }
+                infs.sort((a, b) => b - a);
+                if (infs[0] === controllingInf) {
+                  secondInf = infs[1];
+                } else {
+                  secondInf = infs[0]; // allowing for if highest inf faction != controlling faction
+                }
+
+                const system = {};
+                system.name = obj[i].name;
+                system.id = obj[i].id;
+                system.government = obj[i].government;
+                system.lead = (controllingInf - secondInf).toFixed(2);
+                system.date = lastUpdated(obj[i].minor_factions_updated_at * 1000); // convert from unix timestamp
+                systemData.push(system);
+              }
+              i++;
+            }
+            systemData.sort((a, b) => a.id - b.id); // sorts systems by ID lowest to highest
+            i++;
+          }
+
+        // const netCC = grossCC - overhead - upkeep - netExploitedCC - netContestedCC;
+        }
+      })
+      .on('close', () => {
+        console.log('command done');
+      })
+      .on('error', (err) => {
+        console.log(err);
+      });
   } else if (command === 'help') {
     // readability
-    const version = 'Current Version: 0.8.3';
+    const version = 'Current Version: 0.9.0';
     const preamble = 'All data is as up-to-date as possible via eddb and elitebgs. Jibri can receive dms, and does not log data for any commands given. The default power is Aisling.\n\n';
     const lead = '~lead <system> takes a system and finds the inf% difference between the controlling faction and the next highest\n';
-    const sphere = '~sphere <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a15ly sphere. If the target system is a control system, instead automatically shows control data. Example: ~sphere Winters Mbambiva\n';
+    const sphere = '~sphere <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead automatically shows control data. Example: ~sphere Winters Mbambiva\n';
     const multisphere = '~multisphere <system 1> <system 2> ... <system n> shows all systems overlapped by the 15ly spheres of the input systems.\n';
+    const threats = '!- Beta Command -! ~threats <friendly power> <hostile power> <radius from control systems> shows all systems with a Large landing pad within an input amount from Aisling space.\n~!~Warning~!~ This command does not currently publicly usable due to the massive amount of data it processes, please ping @Cynder#7567 for use.\n';
     const tick = '~tick shows the last tick time\n';
     const cc = '~cc <power> shows the total cc and systems controlled and exploited by a power\n';
     const postamble = 'The dates shown reflect when the leads were last updated, and are roughly autocorrected to the last tick time.\n Powerplay info is pulled from EDDB daily at 2am CST\n';
-    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${lead}${sphere}${multisphere}${cc}${tick}\n ${postamble}\`\`\``);
+    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${lead}${sphere}${multisphere}${threats}${cc}${tick}\n ${postamble}\`\`\``);
   }
 });
 client.login(token);
