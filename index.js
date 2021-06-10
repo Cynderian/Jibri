@@ -762,7 +762,7 @@ client.on('message', (message) => {
                 // In case of >2000 character message overflow
                 let overflowColumns = '';
                 if (columns.length >= 2000) {
-                  const subStr = columns.substring(0, 1900); // for some reason, it needs to be decently <2000
+                  const subStr = columns.substring(0, 1800); // for some reason, it needs to be decently <2000
                   let index;
                   i = 0;
                   let flag = 0;
@@ -1133,11 +1133,11 @@ client.on('message', (message) => {
     obj = fs.readFileSync('stations.json', 'utf8');
     const data = JSON.parse(obj);
     const threatSystems = [];
-    // filter out all systems without a large port && with a port >1kls out
+    // filter out all systems without a large port && with a port >3kls out
     for (let i = 0; i < data.length; i++) {
       for (let j = 0; j < allSystems.length; j++) {
-        // same system & large station & <1kls from star % no power
-        if (data[i].system_id === allSystems[j].id && data[i].max_landing_pad_size === 'L' && data[i].distance_to_star <= 1000) {
+        // same system & large station & <3kls from star % no power
+        if (data[i].system_id === allSystems[j].id && data[i].max_landing_pad_size === 'L' && data[i].distance_to_star <= 3000) {
           // filter out all repeated from being added
           let exists = 0;
           for (let k = 0; k < threatSystems.length; k++) {
@@ -1156,7 +1156,7 @@ client.on('message', (message) => {
         }
       }
     }
-    console.log('potential systems vetted for starports within 1kls');
+    console.log('potential systems vetted for starports within 3kls');
     // find 15ly sphere of all potential systems
     // add net and contested CC to threatSystem objects
     for (let i = 0; i < threatSystems.length; i++) {
@@ -1179,7 +1179,7 @@ client.on('message', (message) => {
             && refSys[j].name !== 'Tarnkappe'
             && refSys[j].name !== 'Tyet'
             && refSys[j].name !== 'Wolfsegen') {
-          if (refSys[j].power_state === null) { // to be control/exploited
+          if (refSys[j].power_state === null || refSys[j].power_state === 'Expansion') { // to be control/exploited
             netCC += popToCC(refSys[j].population);
             // Expansion Ethos
             // Social
