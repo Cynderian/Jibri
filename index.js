@@ -441,8 +441,15 @@ client.on('message', (message) => {
     message.channel.send('Calculating...');
     let input = '';
     let inputPower;
+    let override = 0;
     if (!args.length) { // take all input after sphere and designate it the target system
       return message.channel.send('Please define a reference system.');
+    }
+    // Override to ignore system control state
+    if (args[0] === '-o') {
+      console.log('override enabled');
+      override = 1;
+      args.shift();
     }
     // Power name sanitization
     if (args[0].substring(0, 1) === '-') { // Support for old format
@@ -497,8 +504,10 @@ client.on('message', (message) => {
               refSys = obj.name;
               refSysPower = obj.power;
               refSysPowerState = obj.power_state;
-              if (refSysPowerState === 'Control') {
+              if (refSysPowerState === 'Control' && override === 0) {
                 inputPower = refSysPower;
+              } else {
+                refSysPower = inputPower;
               }
             }
           })
@@ -713,7 +722,6 @@ client.on('message', (message) => {
                   }
                   i++;
                 }
-
                 // shenanigans to get the sort to work correctly when null values exist
                 i = 0;
                 while (systemData[i]) {
@@ -786,7 +794,6 @@ client.on('message', (message) => {
                   setType = 'Control';
                   netCC += netExploitedCC;
                   netCCMax += netExploitedCC;
-                  inputPower = refSysPower;
                 } else {
                   footerInfo = `${exploitedCCStr}`;
                 }
@@ -1376,10 +1383,10 @@ client.on('message', (message) => {
       });
   } else if (command === 'help') {
     // readability
-    const version = 'Current Version: 0.9.1';
+    const version = 'Current Version: 0.9.2';
     const preamble = 'All data is as up-to-date as possible via eddb and elitebgs. Jibri can receive dms, and does not log data for any commands given. The default power is Aisling.\n\n';
     const lead = '~lead <system> takes a system and finds the inf% difference between the controlling faction and the next highest\n';
-    const sphere = '~sphere <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead automatically shows control data. Example: ~sphere Winters Mbambiva\n';
+    const sphere = '~sphere <-o optional> <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead automatically shows control data. Adding -o will make it so the input power name is used regardless of control state. Example: ~sphere Winters Mbambiva\n';
     const multisphere = '~multisphere <system 1> <system 2> ... <system n> shows all systems overlapped by the 15ly spheres of the input systems.\n';
     const threats = '!- Beta Command -! ~threats <friendly power> <hostile power> <distance from main star, in kilo-lightseconds> shows all systems with a Large landing pad within an input amount from Aisling space. This command does not currently publicly usable due to the massive amount of data it processes, please ping @Cynder#7567 for use.\n';
     const tick = '~tick shows the last tick time\n';
