@@ -1070,13 +1070,13 @@ client.on('message', (message) => {
     if (threatPower === undefined) {
       return message.channel.send('Error reading second power name, please try again');
     }
-    // distance input
+    // distance from main star input
     if (!args[2]) {
       return message.channel.send('Please provide a reference distance');
     }
     const distance = Number(args[2], 10);
     if (Number.isNaN(distance)) {
-      return message.channel.send('Please input a whole number for distance');
+      return message.channel.send('Please input a whole number for distance from main star');
     }
 
     const controlSystems = [];
@@ -1115,7 +1115,7 @@ client.on('message', (message) => {
           && refSys[i].name !== 'Tyet'
           && refSys[i].name !== 'Wolfsegen') {
         for (let j = 0; j < controlSystems.length; j++) {
-          if (distLessThan(distance, refSys[i].x, refSys[i].y, refSys[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z) === true
+          if (distLessThan(30, refSys[i].x, refSys[i].y, refSys[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z) === true
             && refSys[i].power === null && refSys[i].power_state !== 'Contested') {
             const system = {};
             system.name = refSys[i].name;
@@ -1133,11 +1133,11 @@ client.on('message', (message) => {
     obj = fs.readFileSync('stations.json', 'utf8');
     const data = JSON.parse(obj);
     const threatSystems = [];
-    // filter out all systems without a large port && with a port >3kls out
+    // filter out all systems without a large port && with a port <(distance)kls out
     for (let i = 0; i < data.length; i++) {
       for (let j = 0; j < allSystems.length; j++) {
-        // same system & large station & <3kls from star % no power
-        if (data[i].system_id === allSystems[j].id && data[i].max_landing_pad_size === 'L' && data[i].distance_to_star <= 3000) {
+        // same system & large station & <(distance)kls from star % no power
+        if (data[i].system_id === allSystems[j].id && data[i].max_landing_pad_size === 'L' && data[i].distance_to_star <= distance * 1000) {
           // filter out all repeated from being added
           let exists = 0;
           for (let k = 0; k < threatSystems.length; k++) {
@@ -1156,15 +1156,15 @@ client.on('message', (message) => {
         }
       }
     }
-    console.log('potential systems vetted for starports within 3kls');
+    console.log('potential systems vetted for starports within <(distance)kls');
     // find 15ly sphere of all potential systems
     // add net and contested CC to threatSystem objects
     for (let i = 0; i < threatSystems.length; i++) {
       let netCC = 0;
       let contestedCC = 0;
-      let favorableSystems = 0;
-      let neutralSystems = 0;
-      let unfavorableSystems = 0;
+      // let favorableSystems = 0;
+      // let neutralSystems = 0;
+      // let unfavorableSystems = 0;
       for (let j = 0; j < refSys.length; j++) {
         if (refSys[j].population > 0
             && distLessThan(15, refSys[j].x, refSys[j].y, refSys[j].z, threatSystems[i].x, threatSystems[i].y, threatSystems[i].z) === true // 15ly sphere
@@ -1181,6 +1181,7 @@ client.on('message', (message) => {
             && refSys[j].name !== 'Wolfsegen') {
           if (refSys[j].power_state === null || refSys[j].power_state === 'Expansion') { // to be control/exploited
             netCC += popToCC(refSys[j].population);
+            /*
             // Expansion Ethos
             // Social
             if (threatPower === 'Pranav Antal') {
@@ -1227,7 +1228,7 @@ client.on('message', (message) => {
                   neutralSystems++;
                 }
               }
-            }
+            } */
           }
           if (refSys[j].power_state === 'Exploited' && refSys[j].power === input) { // to be contested
             contestedCC += popToCC(refSys[j].population);
@@ -1375,12 +1376,12 @@ client.on('message', (message) => {
       });
   } else if (command === 'help') {
     // readability
-    const version = 'Current Version: 0.9.0';
+    const version = 'Current Version: 0.9.1';
     const preamble = 'All data is as up-to-date as possible via eddb and elitebgs. Jibri can receive dms, and does not log data for any commands given. The default power is Aisling.\n\n';
     const lead = '~lead <system> takes a system and finds the inf% difference between the controlling faction and the next highest\n';
     const sphere = '~sphere <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead automatically shows control data. Example: ~sphere Winters Mbambiva\n';
     const multisphere = '~multisphere <system 1> <system 2> ... <system n> shows all systems overlapped by the 15ly spheres of the input systems.\n';
-    const threats = '!- Beta Command -! ~threats <friendly power> <hostile power> <radius from control systems> shows all systems with a Large landing pad within an input amount from Aisling space.\n~!~Warning~!~ This command does not currently publicly usable due to the massive amount of data it processes, please ping @Cynder#7567 for use.\n';
+    const threats = '!- Beta Command -! ~threats <friendly power> <hostile power> <distance from main star, in kilo-lightseconds> shows all systems with a Large landing pad within an input amount from Aisling space. This command does not currently publicly usable due to the massive amount of data it processes, please ping @Cynder#7567 for use.\n';
     const tick = '~tick shows the last tick time\n';
     const cc = '~cc <power> shows the total cc and systems controlled and exploited by a power\n';
     const postamble = 'The dates shown reflect when the leads were last updated, and are roughly autocorrected to the last tick time.\n Powerplay info is pulled from EDDB daily at 2am CST\n';
