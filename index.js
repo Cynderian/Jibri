@@ -1061,6 +1061,11 @@ client.on('message', (message) => {
     if (!args.length) { // take all input after command and designate it the target power
       return message.channel.send('Please define a first reference power.');
     }
+    let showAll = 0;
+    if (args[0] === '-all') {
+      showAll = 1;
+      args.shift();
+    }
     input = args[0]; // start at first argument to avoid an extra ' ' from for loop
     input = capitalize(removeQuotes(input)); // if input is seperated with "", remove them for processing
     input = inputPowerFilter(message, input);
@@ -1122,12 +1127,14 @@ client.on('message', (message) => {
           && refSys[i].name !== 'Tyet'
           && refSys[i].name !== 'Wolfsegen') {
         for (let j = 0; j < controlSystems.length; j++) {
+          // all systems within range of any control sphere
           if (distLessThan(30, refSys[i].x, refSys[i].y, refSys[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z) === true
             && refSys[i].power === null && refSys[i].power_state !== 'Contested') {
             const system = {};
             system.name = refSys[i].name;
             system.id = refSys[i].id;
             system.power = refSys[i].power;
+            system.intersection = controlSystems[j].name; // for tracking which spheres would be intersected
             system.x = refSys[i].x;
             system.y = refSys[i].y;
             system.z = refSys[i].z;
@@ -1140,21 +1147,32 @@ client.on('message', (message) => {
     obj = fs.readFileSync('stations.json', 'utf8');
     const data = JSON.parse(obj);
     const threatSystems = [];
-    // filter out all systems without a large port && with a port <(distance)kls out
+    // filter out all systems without a large port && with a port <(distance)ls out
     for (let i = 0; i < data.length; i++) {
       for (let j = 0; j < allSystems.length; j++) {
-        // same system & large station & <(distance)kls from star % no power
-        if (data[i].system_id === allSystems[j].id && data[i].max_landing_pad_size === 'L' && data[i].distance_to_star <= distance * 1000) {
-          // filter out all repeated from being added
+        // same system & large station & <(distance)ls from star % no power
+        if (data[i].system_id === allSystems[j].id && data[i].max_landing_pad_size === 'L' && data[i].distance_to_star <= distance) {
+          // filter out all repeated data from being added
           let exists = 0;
           for (let k = 0; k < threatSystems.length; k++) {
             if (threatSystems[k].name === allSystems[j].name) {
               exists++;
+              let intersectDuplicate = 0;
+              for (let l = 0; l < (threatSystems[k].intersections).length; l++) { // iterate through existing contested control systems
+                if (threatSystems[k].intersections[l] === allSystems[j].intersection) {
+                  intersectDuplicate = 1;
+                }
+              }
+              if (intersectDuplicate === 0) { // if not duplicate intersect
+                threatSystems[k].intersections.push(allSystems[j].intersection); // add to array
+              }
             }
           }
-          if (exists === 0) {
+          if (exists === 0) { // if not a duplicate
             const threatSystem = {};
             threatSystem.name = allSystems[j].name;
+            threatSystem.intersections = [];
+            (threatSystem.intersections).push(allSystems[j].intersection);
             threatSystem.x = allSystems[j].x;
             threatSystem.y = allSystems[j].y;
             threatSystem.z = allSystems[j].z;
@@ -1163,7 +1181,7 @@ client.on('message', (message) => {
         }
       }
     }
-    console.log('potential systems vetted for starports within <(distance)kls');
+    console.log('potential systems vetted for starports within <(distance)ls');
     // find 15ly sphere of all potential systems
     // add net and contested CC to threatSystem objects
     for (let i = 0; i < threatSystems.length; i++) {
@@ -1172,6 +1190,10 @@ client.on('message', (message) => {
       // let favorableSystems = 0;
       // let neutralSystems = 0;
       // let unfavorableSystems = 0;
+      let MahonCC = 0;
+      let HudsonCC = 0;
+      let WintersCC = 0;
+      let otherImperialCC = 0;
       for (let j = 0; j < refSys.length; j++) {
         if (refSys[j].population > 0
             && distLessThan(15, refSys[j].x, refSys[j].y, refSys[j].z, threatSystems[i].x, threatSystems[i].y, threatSystems[i].z) === true // 15ly sphere
@@ -1237,8 +1259,24 @@ client.on('message', (message) => {
               }
             } */
           }
-          if (refSys[j].power_state === 'Exploited' && refSys[j].power === input) { // to be contested
-            contestedCC += popToCC(refSys[j].population);
+          if (refSys[j].power_state === 'Exploited') {
+            if (refSys[j].power === input) { // to be contested
+              contestedCC += popToCC(refSys[j].population);
+            }
+            if (refSys[j].power === 'Edmund Mahon') {
+              MahonCC += popToCC(refSys[j].population);
+            }
+            if (input === 'Aisling Duval' || input === 'Zemina Torval' || input === 'Arissa Lavigny-Duval' || input === 'Denton Patreus') { // For imperial friendlies
+              if (threatPower === 'Felicia Winters' && refSys[j].power === 'Zachary Hudson') {
+                HudsonCC += popToCC(refSys[j].population);
+              }
+              if (threatPower === 'Zachary Hudson' && refSys[j].power === 'Felicia Winters') {
+                WintersCC += popToCC(refSys[j].population);
+              }
+              if (refSys[j].power === 'Zemina Torval' || refSys[j].power === 'Arissa Lavigny-Duval' || refSys[j].power === 'Denton Patreus') {
+                otherImperialCC += popToCC(refSys[j].population);
+              }
+            }
           }
         }
         // fortification / undermining / expansion triggers
@@ -1263,31 +1301,68 @@ client.on('message', (message) => {
       netCC = netCC - upkeep - overhead;
       // threatSystems[i].net_CC = `${netCC} / ${worstNetCC}`;
       threatSystems[i].net_CC = worstNetCC;
-      threatSystems[i].contested_CC = contestedCC;
+      threatSystems[i].Aisling = contestedCC;
+      // Relevant contested power CC adding
+      if (MahonCC > 0) {
+        threatSystems[i].Mahon = MahonCC;
+      }
+      if (HudsonCC > 0) {
+        threatSystems[i].Hudson = HudsonCC;
+      }
+      if (WintersCC > 0) {
+        threatSystems[i].Winters = WintersCC;
+      }
+      if (otherImperialCC > 0) {
+        threatSystems[i].Imperial = otherImperialCC;
+      }
     }
 
-    // remove x y z needed for data
+    // reorganize and filter data
     for (let i = 0; i < threatSystems.length; i++) {
       delete threatSystems[i].x;
       delete threatSystems[i].y;
-      delete threatSystems[i].z;
+      delete threatSystems[i].z;/*
+      let intersectionString = String(threatSystems[i].intersections[0]);
+      for (let j = 1; j < (threatSystems[i].intersections).length; j++) {
+        intersectionString += `, ${threatSystems[i].intersections[j]}`;
+      } */
+      delete threatSystems[i].intersections;
+      // threatSystems[i].intersect = intersectionString;
     }
 
     // sorts
     threatSystems.sort((a, b) => b.net_CC - a.net_CC); // sorts systems by net CC
-    threatSystems.sort((a, b) => b.contested_CC - a.contested_CC); // sorts systems by contested CC
+    threatSystems.sort((a, b) => b.Aisling - a.Aisling); // sorts systems by contested CC
 
     const columns = columnify(threatSystems); // tabularize info
     // In case of >2000 character message overflow (basically guaranteed)
-    let index = 0;
-    let i = 0;
-    while (columns.indexOf('\n', 1900 * (i + 1)) !== -1) {
-      const block = columns.substring(index, columns.indexOf('\n', 1900 * (i + 1)));
-      index = columns.indexOf('\n', 1900 * (i + 1));
-      message.channel.send(`\`\`\`ini\n${block}\n\`\`\``);
-      i++;
-      i = 100; // temporary manual override so it only prints 1 block
+    if (showAll === 1) {
+      let index = 0;
+      let i = 0;
+      while (columns.indexOf('\n', 1800 * (i + 1)) !== -1) {
+        const block = columns.substring(index, columns.indexOf('\n', 1800 * (i + 1)));
+        index = columns.indexOf('\n', 1900 * (i + 1));
+        message.channel.send(`\`\`\`ini\n${block}\n\`\`\``);
+        i++;
+      }
+    } else {
+      let index = 0;
+      for (let i = 0; i < 3; i++) {
+        const block = columns.substring(index, columns.indexOf('\n', 1800 * (i + 1)));
+        index = columns.indexOf('\n', 1900 * (i + 1));
+        message.channel.send(`\`\`\`ini\n${block}\n\`\`\``);
+      }
+      /*
+      const index = columns.indexOf('\n', 1800);
+      message.channel.send(`\`\`\`ini\n${columns.substring(0, index)}\n\`\`\``);
+      */
     }
+
+    // write to txt
+    fs.writeFile('targets.txt', columns, (err) => {
+      if (err) return console.log(err);
+      console.log('file successfully saved');
+    });
 
     // mem usage
     const used = process.memoryUsage().heapUsed / 1024 / 1024;
@@ -1388,7 +1463,7 @@ client.on('message', (message) => {
     const lead = '~lead <system> takes a system and finds the inf% difference between the controlling faction and the next highest\n';
     const sphere = '~sphere <-o optional> <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead automatically shows control data. Adding -o will make it so the input power name is used regardless of control state. Example: ~sphere Winters Mbambiva\n';
     const multisphere = '~multisphere <system 1> <system 2> ... <system n> shows all systems overlapped by the 15ly spheres of the input systems.\n';
-    const threats = '!- Beta Command -! ~threats <friendly power> <hostile power> <distance from main star, in kilo-lightseconds> shows all systems with a Large landing pad within an input amount from Aisling space. This command does not currently publicly usable due to the massive amount of data it processes, please ping @Cynder#7567 for use.\n';
+    const threats = '!- Beta Command -! ~threats <friendly power> <hostile power> <distance from main star, in lightseconds> shows all systems with a Large landing pad within an input amount from Aisling space. This command does not currently publicly usable due to the massive amount of data it processes, please ping @Cynder#7567 for use.\n';
     const tick = '~tick shows the last tick time\n';
     const cc = '~cc <power> shows the total cc and systems controlled and exploited by a power\n';
     const postamble = 'The dates shown reflect when the leads were last updated, and are roughly autocorrected to the last tick time.\n Powerplay info is pulled from EDDB daily at 2am CST\n';
