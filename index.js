@@ -675,16 +675,17 @@ client.on('message', (message) => {
                     // Expansion Ethos
                     // Social
                     if (inputPower === 'Pranav Antal') {
-                      if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
-                    && systemData[i].state !== 'Control') {
-                        if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
+                      if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Control') {
+                        if ((systemData[i].power === inputPower && systemData[i].state === 'Exploited') || systemData[i].state !== 'Exploited') {
+                          if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
                       || systemData[i].government === 'Confederacy') {
-                          favorableSystems++;
-                        } else if (systemData[i].government === 'Feudal' || systemData[i].government === 'Prison Colony'
+                            favorableSystems++;
+                          } else if (systemData[i].government === 'Feudal' || systemData[i].government === 'Prison Colony'
                       || systemData[i].government === 'Theocracy') {
-                          unfavorableSystems++;
-                        } else { // all others, aka if neutral
-                          neutralSystems++;
+                            unfavorableSystems++;
+                          } else { // all others, aka if neutral
+                            neutralSystems++;
+                          }
                         }
                       }
                     }
@@ -692,14 +693,15 @@ client.on('message', (message) => {
                     if (inputPower === 'Zachary Hudson' || inputPower === 'Arissa Lavigny-Duval'
                   || inputPower === 'Archon Delaine' || inputPower === 'Denton Patreus'
                   || inputPower === 'Yuri Grom') {
-                      if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
-                    && systemData[i].state !== 'Control') {
-                        if (systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
-                          favorableSystems++;
-                        } else if (systemData[i].government === 'Dictatorship') {
-                          unfavorableSystems++;
-                        } else { // all others, aka if neutral
-                          neutralSystems++;
+                      if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Control') {
+                        if ((systemData[i].power === inputPower && systemData[i].state === 'Exploited') || systemData[i].state !== 'Exploited') {
+                          if (systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                            favorableSystems++;
+                          } else if (systemData[i].government === 'Dictatorship') {
+                            unfavorableSystems++;
+                          } else { // all others, aka if neutral
+                            neutralSystems++;
+                          }
                         }
                       }
                     }
@@ -707,15 +709,16 @@ client.on('message', (message) => {
                     if (inputPower === 'Aisling Duval' || inputPower === 'Felicia Winters'
                   || inputPower === 'Edmund Mahon' || inputPower === 'Li Yong-Rui'
                   || inputPower === 'Zemina Torval') {
-                      if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Exploited'
-                    && systemData[i].state !== 'Control') {
-                        if (systemData[i].government === 'Corporate') {
-                          favorableSystems++;
-                        } else if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
-                      || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
-                          unfavorableSystems++;
-                        } else { // all others, aka if neutral
-                          neutralSystems++;
+                      if (systemData[i].state !== 'Contested' && systemData[i].state !== 'Control') {
+                        if ((systemData[i].power === inputPower && systemData[i].state === 'Exploited') || systemData[i].state !== 'Exploited') {
+                          if (systemData[i].government === 'Corporate') {
+                            favorableSystems++;
+                          } else if (systemData[i].government === 'Communism' || systemData[i].government === 'Cooperative'
+                        || systemData[i].government === 'Feudal' || systemData[i].government === 'Patronage') {
+                            unfavorableSystems++;
+                          } else { // all others, aka if neutral
+                            neutralSystems++;
+                          }
                         }
                       }
                     }
@@ -807,7 +810,7 @@ client.on('message', (message) => {
                   expFort = Math.round(0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5); // neutral fort trigger
                 }
                 umOpp = Math.round(2750000 / (HQDistance ** 1.5) + 5000); // opposition trigger
-                oppOrFortInfo = `${expFort} to fortify, ${umOpp} to undermine`;
+                oppOrFortInfo = `${(expFort / umOpp).toFixed(2)}:1 triggers`;
 
                 // add max overhead if power is not at max already
                 let maxOverheadStr = `/ ${netCCMax.toFixed(1)}CC at max overhead`;
@@ -818,13 +821,13 @@ client.on('message', (message) => {
                 // warning addition
                 let warningStr = '';
                 if (refSysPowerState === 'Exploited') {
-                  warningStr = `-- Warning: Target system is already exploited by ${refSysPower} --\n`;
+                  warningStr = '[ Warning: Target system is already exploited from ]\n';
                 } else if (refSysPowerState === 'Expansion') {
-                  warningStr = `-- Warning: Target system is currently being expanded from by ${refSysPower} --\n`;
+                  warningStr = '[ Warning: Target system is currently being expanded from ]\n';
                 }
 
                 // output
-                message.channel.send(`\`\`\`ini\n[${refSys} ${setType} Sphere Analysis] ${oppOrFortInfo}\n${warningStr}\n${columns}\n\`\`\``);
+                message.channel.send(`\`\`\`asciidoc\n= ${refSys} ${setType} Sphere Analysis\t\t${oppOrFortInfo}\n${warningStr}\n${columns}\n\`\`\``);
                 if (overflowColumns.length > 0) {
                   message.channel.send(`\`\`\`\n${overflowColumns}\n\`\`\``);
                 }
@@ -973,7 +976,7 @@ client.on('message', (message) => {
             }
             refSysStr = refSysStr.slice(0, -2);
             const overlapColumns = columnify(overlapData); // tabularize info
-            message.channel.send(`\`\`\`ini\n[${refSysStr} Sphere Overlap Analysis]\n\n${overlapColumns}\n\`\`\``);
+            message.channel.send(`\`\`\`asciidoc\n= ${refSysStr} Sphere Overlap Analysis =\n\n${overlapColumns}\n\`\`\``);
             console.log('command done');
           })
           .on('error', (err) => {
@@ -1214,8 +1217,8 @@ client.on('message', (message) => {
             // Expansion Ethos
             // Social
             if (threatPower === 'Pranav Antal') {
-              if (refSys[j].state !== 'Contested' && refSys[j].state !== 'Exploited'
-                && refSys[j].state !== 'Control') {
+              if ((systemData[i].power === inputPower && systemData[i].state === 'Exploited') || systemData[i].state !== 'Exploited') {
+                          if (systemData[i].government === 'Corporate') {
                 if (refSys[j].government === 'Communism' || refSys[j].government === 'Cooperative'
                   || refSys[j].government === 'Confederacy') {
                   favorableSystems++;
@@ -1224,30 +1227,30 @@ client.on('message', (message) => {
                   unfavorableSystems++;
                 } else { // all others, aka if neutral
                   neutralSystems++;
-                }
+                }}
               }
             }
             // Combat
             if (threatPower === 'Zachary Hudson' || threatPower === 'Arissa Lavigny-Duval'
               || threatPower === 'Archon Delaine' || threatPower === 'Denton Patreus'
               || threatPower === 'Yuri Grom') {
-              if (refSys[j].state !== 'Contested' && refSys[j].state !== 'Exploited'
-                && refSys[j].state !== 'Control') {
+              if ((systemData[i].power === inputPower && systemData[i].state === 'Exploited') || systemData[i].state !== 'Exploited') {
+                          if (systemData[i].government === 'Corporate') {
                 if (refSys[j].government === 'Feudal' || refSys[j].government === 'Patronage') {
                   favorableSystems++;
                 } else if (refSys[j].government === 'Dictatorship') {
                   unfavorableSystems++;
                 } else { // all others, aka if neutral
                   neutralSystems++;
-                }
+                }}
               }
             }
             // Finance
             if (threatPower === 'Aisling Duval' || threatPower === 'Felicia Winters'
               || threatPower === 'Edmund Mahon' || threatPower === 'Li Yong-Rui'
               || threatPower === 'Zemina Torval') {
-              if (refSys[j].state !== 'Contested' && refSys[j].state !== 'Exploited'
-                && refSys[j].state !== 'Control') {
+              if ((systemData[i].power === inputPower && systemData[i].state === 'Exploited') || systemData[i].state !== 'Exploited') {
+                          if (systemData[i].government === 'Corporate') {
                 if (refSys[j].government === 'Corporate') {
                   favorableSystems++;
                 } else if (refSys[j].government === 'Communism' || refSys[j].government === 'Cooperative'
@@ -1255,7 +1258,7 @@ client.on('message', (message) => {
                   unfavorableSystems++;
                 } else { // all others, aka if neutral
                   neutralSystems++;
-                }
+                }}
               }
             } */
           }
@@ -1342,7 +1345,7 @@ client.on('message', (message) => {
       while (columns.indexOf('\n', 1800 * (i + 1)) !== -1) {
         const block = columns.substring(index, columns.indexOf('\n', 1800 * (i + 1)));
         index = columns.indexOf('\n', 1900 * (i + 1));
-        message.channel.send(`\`\`\`ini\n${block}\n\`\`\``);
+        message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
         i++;
       }
     } else {
@@ -1350,7 +1353,7 @@ client.on('message', (message) => {
       for (let i = 0; i < 3; i++) {
         const block = columns.substring(index, columns.indexOf('\n', 1800 * (i + 1)));
         index = columns.indexOf('\n', 1900 * (i + 1));
-        message.channel.send(`\`\`\`ini\n${block}\n\`\`\``);
+        message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
       }
       /*
       const index = columns.indexOf('\n', 1800);
@@ -1463,11 +1466,11 @@ client.on('message', (message) => {
     const lead = '~lead <system> takes a system and finds the inf% difference between the controlling faction and the next highest\n';
     const sphere = '~sphere <-o optional> <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead automatically shows control data. Adding -o will make it so the input power name is used regardless of control state. Example: ~sphere Winters Mbambiva\n';
     const multisphere = '~multisphere <system 1> <system 2> ... <system n> shows all systems overlapped by the 15ly spheres of the input systems.\n';
-    const threats = '!- Beta Command -! ~threats <friendly power> <hostile power> <distance from main star, in lightseconds> shows all systems with a Large landing pad within an input amount from Aisling space. This command does not currently publicly usable due to the massive amount of data it processes, please ping @Cynder#7567 for use.\n';
+    // const threats = '!- Beta Command -! ~threats <friendly power> <hostile power> <distance from main star, in lightseconds> shows all systems with a Large landing pad within an input amount from Aisling space. This command does not currently publicly usable due to the massive amount of data it processes, please ping @Cynder#7567 for use.\n';
     const tick = '~tick shows the last tick time\n';
     const cc = '~cc <power> shows the total cc and systems controlled and exploited by a power\n';
     const postamble = 'The dates shown reflect when the leads were last updated, and are roughly autocorrected to the last tick time.\n Powerplay info is pulled from EDDB daily at 2am CST\n';
-    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${lead}${sphere}${multisphere}${threats}${cc}${tick}\n ${postamble}\`\`\``);
+    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${lead}${sphere}${multisphere}${cc}${tick}\n ${postamble}\`\`\``);
   }
 });
 client.login(token);
