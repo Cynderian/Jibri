@@ -14,7 +14,8 @@ const columnify = require('columnify');
 const Discord = require('discord.js');
 const { prefix, token } = require('./config.json');
 
-let newTick = '';
+let newTick = new Date();
+const today = new Date();
 const client = new Discord.Client(); // game start!
 
 function inputPowerFilter(message, input) {
@@ -143,7 +144,7 @@ async function getURL(base, ...args) { // pass url and the ?/&
   return response.json();
 }
 
-function infLead(data, sys = 0) {
+function infLead(data, sys = 0) { // only works for ebgs
   let inf = [];
   let i = 0;
   do {
@@ -152,6 +153,23 @@ function infLead(data, sys = 0) {
   } while (data.docs[sys].factions[i]);
   inf = inf.sort((a, b) => b - a);
   return (((inf[0] - inf[1]) * 100).toFixed(2));
+}
+
+function infLeadEddb(data, i) { // inf lead for eddb json
+  let controllingInf = 0;
+  let secondInf = 0;
+  for (let j = 0; j < data[i].minor_faction_presences.length; j++) {
+    if (controllingInf !== 0) {
+      if (data[i].minor_faction_presences[j].influence !== controllingInf && data[i].minor_faction_presences[j].influence > secondInf) {
+        secondInf = data[i].minor_faction_presences[j].influence;
+        break;
+      }
+    } else if (controllingInf === 0 && data[i].controlling_minor_faction_id === data[i].minor_faction_presences[j].minor_faction_id) {
+      controllingInf = data[i].minor_faction_presences[j].influence;
+      j = -1;
+    }
+  }
+  return (controllingInf - secondInf).toFixed(2);
 }
 
 function capitalize(str) {
@@ -193,7 +211,22 @@ function lastUpdated(date) {
   && lastUpdate.getTime() <= newTick.getTime()) {
     lastDay--;
   }
-  return `${lastUpdate.getMonth() + 1}/${lastDay}`;
+  let lastYear = lastUpdate.getFullYear();
+  let lastMonth = lastUpdate.getMonth() + 1; // month counting starts at 0
+  if (lastDay === 0) {
+    lastDay = new Date(lastUpdate.getFullYear(), lastUpdate.getMonth() - 1, 0).getDate(); // find days in previous month, month value is for the month after. For lastDay = 0 edge case
+    if (lastMonth === 1) {
+      lastYear -= 1;
+      lastMonth = 12;
+    } else {
+      lastMonth -= 1;
+    }
+  }
+  const lastTick = {};
+  lastTick.year = lastYear;
+  lastTick.month = lastMonth;
+  lastTick.day = lastDay;
+  return lastTick;
 }
 
 function eddbBackup(message, input) {
@@ -201,7 +234,7 @@ function eddbBackup(message, input) {
   let inputX;
   let inputY;
   let inputZ;
-  const data = fs.readFileSync('systems_populated.json', 'utf8');
+  const data = fs.readFileSync(`systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
   let i = 0;
   const obj = JSON.parse(data);
 
@@ -252,13 +285,15 @@ function eddbBackup(message, input) {
       } else {
         secondInf = infs[0]; // allowing for if highest inf faction != controlling faction
       }
+      const lastTick = lastUpdated(obj[i].minor_factions_updated_at * 1000); // convert from unix timestamp
 
       const system = {};
       system.name = obj[i].name;
-      system.id = obj[i].id;
+      // system.id = obj[i].id;
+      system.id = obj[i].ed_system_address; // workaround
       system.government = obj[i].government;
       system.lead = (controllingInf - secondInf).toFixed(2);
-      system.date = lastUpdated(obj[i].minor_factions_updated_at * 1000); // convert from unix timestamp
+      system.date = `${lastTick.month}/${lastTick.day}`;
       systemData.push(system);
     }
     i++;
@@ -312,7 +347,8 @@ async function ebgsOrEddb(message, url, input) {
                 && data[i].docs[j].name !== 'Wolfsegen') {
           const system = {};
           system.name = data[i].docs[j].name;
-          system.id = data[i].docs[j].eddb_id;
+          // system.id = data[i].docs[j].eddb_id;
+          system.id = Number(data[i].docs[j].system_address); // workaround for ebgs missing some eddb ids
           // determining controlling faction's government
           let k = 0;
           while (data[i].docs[j].factions[k]) {
@@ -322,7 +358,8 @@ async function ebgsOrEddb(message, url, input) {
             k++;
           }
           system.lead = infLead(data[i], j);
-          system.date = lastUpdated(data[i].docs[j].updated_at);
+          const lastTick = lastUpdated(data[i].docs[j].updated_at);
+          system.date = `${lastTick.month}/${lastTick.day}`;
           systemData.push(system); // push object with names to array
         }
         j++; // increment system selection
@@ -355,10 +392,10 @@ function mirrorEddb() {
   const urlThree = 'https://eddb.io/archive/v6/stations.json';
   // save file as data for day before
   const pathOne = 'systems_populated.jsonl';
-  const pathTwo = 'systems_populated.json';
+  const pathTwo = `systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`;
   const pathThree = 'stations.json';
   download(urlOne, pathOne, () => {
-    exec('truncate -s -1 systems_populated.jsonl', (error) => {
+    exec('truncate -s -1 systems_populated.jsonl', (error) => { // remove blank line from end of jsonl file
       if (error !== null) {
         console.log(`exec error: ${error}`);
       }
@@ -373,6 +410,16 @@ function mirrorEddb() {
   download(urlThree, pathThree, () => {
     const now = new Date();
     console.log(`EDDB station json mirrored at ${now}`);
+  });
+  let oldData = new Date();
+  oldData = oldData.setDate(today.getDate() - 6); // find 6 days prior in ms
+  oldData = new Date(oldData); // convert ms to Date object
+  const oldJSON = `systems_populated_${oldData.getMonth() + 1}_${oldData.getDate()}_${oldData.getFullYear()}.json`;
+  fs.stat(oldJSON, (err) => { // check if old data exists
+    if (err) return console.log(err);
+    fs.unlink(oldJSON, () => { // delete old data
+      console.log('file deleted successfully');
+    });
   });
 }
 
@@ -394,7 +441,7 @@ client.on('ready', () => {
   console.info('Logged in!');
   client.user.setActivity('All systems online');
   // mirror eddb file and remove the last blank line
-  mirrorEddb();
+  // mirrorEddb(); // commented for testing
 
   // tick handling
   getURL('https://elitebgs.app/api/ebgs/v5/ticks')
@@ -404,13 +451,13 @@ client.on('ready', () => {
     })
     .catch((err) => console.log(`Tick get failed, ${err}`));
 
-  setInterval(() => { // grab tick every minute
+  setInterval(() => { // grab tick every 5 minutes
     getURL('https://elitebgs.app/api/ebgs/v5/ticks')
       .then((tickData) => {
         newTick = new Date(tickData[0].time);
       })
       .catch((err) => console.log(`Tick get failed, ${err}`));
-  }, 60000);
+  }, 60000 * 5);
 });
 
 client.on('message', (message) => {
@@ -480,7 +527,6 @@ client.on('message', (message) => {
           return;
         }
         systemData = Array.from(tmpData);
-
         let grossCC = 0;
         let favorableSystems = 0;
         let unfavorableSystems = 0;
@@ -492,7 +538,6 @@ client.on('message', (message) => {
         let refSysz;
         const exploitedData = [];
 
-        let i = 0;
         let refSys;
         let refSysPower = '';
         let refSysPowerState = '';
@@ -512,12 +557,12 @@ client.on('message', (message) => {
             }
           })
           .on('close', () => {
-            i = 0;
             fs.createReadStream('systems_populated.jsonl')
               .pipe(split(JSON.parse))
               .on('data', (obj) => { // this iterates through every system
-                if (systemData[i] != null) {
-                  if (obj.id === systemData[i].id) {
+                for (let i = 0; i < systemData.length; i++) {
+                  // if (obj.id === systemData[i].id) {
+                  if (obj.ed_system_address === systemData[i].id) { // workaround
                     // Account for exploited systems
                     const exploitedSystem = {};
                     if ((obj.name).toLowerCase() === input.toLowerCase()) { // (to be) control system
@@ -548,17 +593,13 @@ client.on('message', (message) => {
                     systemData[i].state = obj.power_state;
                     i++;
                   }
-                }
-                if (obj.power === inputPower && obj.power_state === 'Control') {
-                  powerControlSys++;
+                  if (obj.power === inputPower && obj.power_state === 'Control') {
+                    powerControlSys++;
+                  }
                 }
               })
               .on('close', () => { // acting as .then for createReadStream
-                i = 0;
-                while (systemData[i]) {
-                  delete systemData[i].id;
-                  i++;
-                }
+                for (let i = 0; i < systemData.length; i++) delete systemData[i].id;
                 // convert contested CC values into readable strings
                 // Sort by power alphabetically
                 exploitedData.sort((a, b) => {
@@ -576,7 +617,7 @@ client.on('message', (message) => {
                   let powerName = exploitedData[0].power; // set initial power
                   exploitedCCStr = '';
                   exploitedCC = 0;
-                  for (i = 0; i < exploitedData.length; i++) { // Add CC by power
+                  for (let i = 0; i < exploitedData.length; i++) { // Add CC by power
                     if (powerName === exploitedData[i].power) {
                       exploitedCC += exploitedData[i].cc;
                       netExploitedCC += exploitedData[i].cc;
@@ -606,7 +647,7 @@ client.on('message', (message) => {
                 let netCC = grossCC - overhead - upkeep - netExploitedCC - netContestedCC;
                 let netCCMax = grossCC - overheadMax - upkeep - netExploitedCC - netContestedCC;
                 // calculate favorable/neutral/unfavorable systems
-                i = 0;
+                let i = 0;
                 while (systemData[i]) {
                   // highlights control system in list
                   if (systemData[i].name === refSys && refSysPowerState !== 'Control') {
@@ -821,7 +862,7 @@ client.on('message', (message) => {
                 // warning addition
                 let warningStr = '';
                 if (refSysPowerState === 'Exploited') {
-                  warningStr = '[ Warning: Target system is already exploited from ]\n';
+                  warningStr = '[ Warning: Target system is already exploited ]\n';
                 } else if (refSysPowerState === 'Expansion') {
                   warningStr = '[ Warning: Target system is currently being expanded from ]\n';
                 }
@@ -1058,6 +1099,10 @@ client.on('message', (message) => {
         console.log(err);
       });
   } else if (command === 'threats') {
+    if (message.author.id !== '182976741373902848') { // only Cynder#7567 can use this
+      console.log('- - Unauthorized command \'threats\' attempted - -');
+      return message.channel.send('You do not have permission to use this command.');
+    }
     console.log('working on threats');
     message.channel.send('Calculating...');
     let input = '';
@@ -1065,7 +1110,7 @@ client.on('message', (message) => {
       return message.channel.send('Please define a first reference power.');
     }
     let showAll = 0;
-    if (args[0] === '-all') {
+    if (args[0] === '-f') {
       showAll = 1;
       args.shift();
     }
@@ -1097,7 +1142,7 @@ client.on('message', (message) => {
     const controlSystems = [];
     const allSystems = [];
     let threatControlSystems = 0;
-    let obj = fs.readFileSync('systems_populated.json', 'utf8');
+    let obj = fs.readFileSync(`systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
     const refSys = JSON.parse(obj);
     // grab all friendly power control systems
     for (let i = 0; i < refSys.length; i++) {
@@ -1146,7 +1191,7 @@ client.on('message', (message) => {
         }
       }
     }
-    console.log('potential systems found');
+    console.log(`${allSystems.length} potential systems found`);
     obj = fs.readFileSync('stations.json', 'utf8');
     const data = JSON.parse(obj);
     const threatSystems = [];
@@ -1391,7 +1436,7 @@ client.on('message', (message) => {
           let inputX;
           let inputY;
           let inputZ;
-          const data = fs.readFileSync('systems_populated.json', 'utf8');
+          const data = fs.readFileSync(`systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
           let i = 0;
           const obj = JSON.parse(data);
           const input = refSys.name;
@@ -1435,13 +1480,14 @@ client.on('message', (message) => {
                 } else {
                   secondInf = infs[0]; // allowing for if highest inf faction != controlling faction
                 }
+                const lastTick = lastUpdated(obj[i].minor_factions_updated_at * 1000); // convert from unix timestamp
 
                 const system = {};
                 system.name = obj[i].name;
                 system.id = obj[i].id;
                 system.government = obj[i].government;
                 system.lead = (controllingInf - secondInf).toFixed(2);
-                system.date = lastUpdated(obj[i].minor_factions_updated_at * 1000); // convert from unix timestamp
+                system.date = `${lastTick.month}/${lastTick.day}`;
                 systemData.push(system);
               }
               i++;
@@ -1459,9 +1505,259 @@ client.on('message', (message) => {
       .on('error', (err) => {
         console.log(err);
       });
+  } else if (command === 'scout') {
+    if (message.author.id !== '182976741373902848' // Cynder
+    && message.author.id !== '173834440227684352' // :ikuo:
+    && message.author.id !== '522888275283673092' // :penguin:
+    && message.author.id !== '100903405358190592' // DivadRex
+    && message.author.id !== '187391406111850496' // AERO
+    && message.author.id !== '209888324930764800' // :ocean:
+    && message.author.id !== '202852077993590785' // :oraki:
+    && message.author.id !== '404662765299433472' // Schielman
+    && message.author.id !== '552524920643518465' // Momomomomo
+    && message.author.id !== '174069540563451905') { // Andalyn
+      console.log('- - Unauthorized command \'scout\' attempted - -');
+      return message.channel.send('You do not have permission to use this command.');
+    }
+    console.log('working on scout');
+    message.channel.send('Calculating...');
+    let scanArea = '';
+    if (!args.length) {
+      return message.channel.send('Please define internal or external');
+    }
+    if (args[0] === 'internal' || args[0] === 'external') {
+      scanArea = args[0];
+    } else {
+      return message.channel.send('Please define internal or external');
+    }
+    if (!args[1]) {
+      return message.channel.send('Please specify how many days ago to compare data to');
+    }
+    let daysAgo = Number(args[1]);
+    if (!Number.isNaN(args[1]) && args[1] < 6 && args[1] > 0) {
+      daysAgo = args[1];
+    } else {
+      return message.channel.send('Please specify how many days ago to compare data to');
+    }
+
+    /* power-dynamic option instead of just Aisling
+    let input = '';
+    if (!args.length) { // take all input after command and designate it the target power
+      return message.channel.send('Please define a first reference power.');
+    }
+    input = args[0]; // start at first argument to avoid an extra ' ' from for loop
+    input = capitalize(removeQuotes(input)); // if input is seperated with "", remove them for processing
+    input = inputPowerFilter(message, input);
+    if (input === undefined) {
+      return message.channel.send('Error reading first power name, please try again');
+    } */
+    const input = 'Aisling Duval';
+    console.log(`systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`);
+    let obj = fs.readFileSync(`systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
+    let allSystems = JSON.parse(obj);
+    const controlSystems = [];
+    // grab all friendly power control systems
+    for (let i = 0; i < allSystems.length; i++) {
+      if (allSystems[i].power === input && allSystems[i].power_state === 'Control') {
+        const controlSystem = {};
+        controlSystem.name = allSystems[i].name;
+        controlSystem.x = allSystems[i].x;
+        controlSystem.y = allSystems[i].y;
+        controlSystem.z = allSystems[i].z;
+        controlSystems.push(controlSystem);
+      }
+    }
+    console.log(`${controlSystems.length} control systems fetched`);
+    // find all systems within the input range
+    const potentialSystems = [];
+    for (let i = 0; i < allSystems.length; i++) {
+      if (allSystems[i].population > 0
+          && allSystems[i].name !== 'Shinrarta Dezhra' // you know where this is
+          && allSystems[i].name !== 'Azoth' // 10 starter systems
+          && allSystems[i].name !== 'Dromi'
+          && allSystems[i].name !== 'Lia Fall'
+          && allSystems[i].name !== 'Matet'
+          && allSystems[i].name !== 'Orna'
+          && allSystems[i].name !== 'Otegine'
+          && allSystems[i].name !== 'Sharur'
+          && allSystems[i].name !== 'Tarnkappe'
+          && allSystems[i].name !== 'Tyet'
+          && allSystems[i].name !== 'Wolfsegen') {
+        for (let j = 0; j < controlSystems.length; j++) {
+          // all systems within 45ly of any control sphere
+          if (distLessThan(45, allSystems[i].x, allSystems[i].y, allSystems[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z) === true
+          && allSystems[i].power !== 'Aisling Duval'
+          && allSystems[i].government !== 'Corporate') {
+            let copy = 0;
+            for (let k = 0; k < potentialSystems.length; k++) {
+              if (allSystems[i].name === potentialSystems[k].name) {
+                copy = 1;
+              }
+            }
+            if (copy === 0) {
+              const system = {};
+              system.name = allSystems[i].name;
+              system.minor_factions_updated_at = allSystems[i].minor_factions_updated_at;
+              system.controlling_minor_faction_id = allSystems[i].controlling_minor_faction_id;
+              system.minor_faction_presences = allSystems[i].minor_faction_presences;
+              system.power = allSystems[i].power;
+              potentialSystems.push(system);
+            }
+          }
+        }
+      }
+    }
+    console.log(`${potentialSystems.length} potential systems found`);
+    const scoutedSystems = [];
+    // recreate potential systems list using old data for compairson
+    let oldData = new Date();
+    oldData = oldData.setDate(oldData.getDate() - daysAgo); // find days prior in ms
+    oldData = new Date(oldData); // convert ms to Date object
+    const oldJSON = `systems_populated_${oldData.getMonth() + 1}_${oldData.getDate()}_${oldData.getFullYear()}.json`;
+    obj = fs.readFileSync(oldJSON, 'utf8');
+    allSystems = [];
+    allSystems = JSON.parse(obj);
+    const oldSystems = [];
+    for (let i = 0; i < potentialSystems.length; i++) {
+      for (let j = 0; j < allSystems.length; j++) {
+        if (potentialSystems[i].name === allSystems[j].name) {
+          const system = {};
+          system.name = allSystems[j].name;
+          system.minor_factions_updated_at = allSystems[j].minor_factions_updated_at;
+          system.controlling_minor_faction_id = allSystems[j].controlling_minor_faction_id;
+          system.minor_faction_presences = allSystems[j].minor_faction_presences;
+          system.power = allSystems[j].power;
+          oldSystems.push(system);
+        }
+      }
+    }
+    for (let i = 0; i < potentialSystems.length; i++) {
+      if (scanArea === 'internal' // unfinished, All exploited CCC controlled systems within AD space (the 'castle')
+        && potentialSystems[i].power === 'Aisling Duval'
+        && (potentialSystems[i].government === 'Communism' || potentialSystems[i].government === 'Cooperative' || potentialSystems[i].government === 'Confederacy')
+        && potentialSystems[i].power_state === 'Exploited') {
+        // find leads
+        const lead = infLeadEddb(potentialSystems, i);
+        const leadOld = infLeadEddb(oldSystems, i);
+
+        const system = {};
+        system.name = potentialSystems[i].name;
+        system.lead = lead;
+        system.lead_old = leadOld;
+        system.updated_at = lastUpdated(potentialSystems[i].minor_factions_updated_at * 1000);
+        scoutedSystems.push(system);
+      } else if (scanArea === 'external' // All systems within the 'moat' around AD space
+        && (potentialSystems[i].power === null || potentialSystems[i].power === 'Felicia Winters')
+        && potentialSystems[i].government !== 'Corporate'
+        && potentialSystems[i].power_state !== 'Contested') {
+        // find leads
+        const lead = infLeadEddb(potentialSystems, i);
+        const leadOld = infLeadEddb(oldSystems, i);
+
+        const system = {};
+        system.name = potentialSystems[i].name;
+        system.lead = lead;
+        system.lead_old = leadOld;
+        system.updated_at = lastUpdated(potentialSystems[i].minor_factions_updated_at * 1000);
+        scoutedSystems.push(system);
+      }
+    }
+
+    const testSystems = [];
+    for (let i = 0; i < 1; i++) {
+      testSystems.push(scoutedSystems[i]);
+    }
+    /* testing
+    const ebgsPromises = [];
+    for (let i = 0; i < testSystems.length; i++) {
+      const fetchName = testSystems[i].name;
+      const delay = i * 200;
+      const promise = new Promise((resolve) => setTimeout(resolve, delay)).then(() => fetch(`https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&referenceSystem=${fetchName}`));
+      ebgsPromises.push(promise);
+    }
+    */
+    const ebgsPromises = [];
+    /* temp while tick is bleh
+    for (let i = 0; i < scoutedSystems.length; i++) {
+      const fetchName = scoutedSystems[i].name;
+      const delay = i * 200;
+      const promise = new Promise((resolve) => setTimeout(resolve, delay)).then(() => fetch(`https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&referenceSystem=${fetchName}`));
+      ebgsPromises.push(promise);
+    }
+    */
+    console.log(`fetching ${scoutedSystems.length} promises, this will take approximately ${(ebgsPromises.length * (2 / 10) + 5).toFixed(1)} seconds\n`);
+    Promise.all(ebgsPromises)
+      .then((responses) => {
+        const data = Promise.all(responses.map((response) => response.json()));
+        console.log('processing data');
+        for (let i = 0; data.length; i++) {
+          const ebgsUpdated = lastUpdated(data[i].docs[0].updated_at);
+
+          if (scoutedSystems[i].updated_at.year > ebgsUpdated.year) { // later year
+            scoutedSystems[i].lead = infLead(data[i]);
+            scoutedSystems[i].updated_at = ebgsUpdated;
+          } else if (scoutedSystems[i].updated_at.year === ebgsUpdated.year && scoutedSystems[i].updated_at.month > ebgsUpdated.month) { // later month
+            scoutedSystems[i].lead = infLead(data[i]);
+            scoutedSystems[i].updated_at = ebgsUpdated;
+          } else if (scoutedSystems[i].updated_at.year === ebgsUpdated.year && scoutedSystems[i].updated_at.month === ebgsUpdated.month && scoutedSystems[i].updated_at.day > ebgsUpdated.day) { // later day
+            scoutedSystems[i].lead = infLead(data[i]);
+            scoutedSystems[i].updated_at = ebgsUpdated;
+          }
+        }
+
+        // modify array
+        for (let i = 0; i < scoutedSystems.length; i++) {
+          scoutedSystems[i].updated_at = `${scoutedSystems[i].updated_at.month}/${scoutedSystems[i].updated_at.day}`; // make updated_at displayable
+          scoutedSystems[i].delta = (scoutedSystems[i].lead - scoutedSystems[i].lead_old).toFixed(2); // change in lead
+        }
+
+        // make final array
+        const finalSystems = [];
+        for (let i = 0; i < scoutedSystems.length; i++) {
+          if (Number(scoutedSystems[i].delta) <= -5) {
+            finalSystems.push(scoutedSystems[i]);
+          }
+        }
+
+        // sorts
+        // delta -> lead
+        finalSystems.sort((a, b) => a.lead - b.lead); // sorts systems by lead lowest to highest
+        finalSystems.sort((a, b) => a.delta - b.delta); // sorts systems by delta lowest to highest
+
+        // outputting
+        // test array
+        /* const subSystems = [];
+        for (let i = 0; i < 5; i++) {
+          subSystems.push(scoutedSystems[i]);
+        }
+        const block = columnify(subSystems);
+        message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+        */
+        message.channel.send(`Comparing bgs data from ${today.getMonth() + 1}/${today.getDate() - 1}/${today.getFullYear()} to ${oldData.getMonth() + 1}/${oldData.getDate() - 1}/${oldData.getFullYear()} post-tick`);
+
+        let subSystems = [];
+        for (let i = 0; i < finalSystems.length; i++) {
+          subSystems.push(finalSystems[i]);
+          if ((i + 1) % 30 === 0) {
+            const block = columnify(subSystems);
+            subSystems = [];
+            message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+          }
+        }
+
+        // write to txt
+        fs.writeFile(`scout_${daysAgo}.txt`, columnify(finalSystems), (err) => {
+          if (err) return console.log(err);
+          console.log('file successfully saved');
+        });
+
+        // mem usage
+        const used = process.memoryUsage().heapUsed / 1024 / 1024;
+        console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
+      });
   } else if (command === 'help') {
     // readability
-    const version = 'Current Version: 0.9.2';
+    const version = 'Current Version: 0.9.4';
     const preamble = 'All data is as up-to-date as possible via eddb and elitebgs. Jibri can receive dms, and does not log data for any commands given. The default power is Aisling.\n\n';
     const lead = '~lead <system> takes a system and finds the inf% difference between the controlling faction and the next highest\n';
     const sphere = '~sphere <-o optional> <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead automatically shows control data. Adding -o will make it so the input power name is used regardless of control state. Example: ~sphere Winters Mbambiva\n';
