@@ -234,7 +234,7 @@ function eddbBackup(message, input) {
   let inputX;
   let inputY;
   let inputZ;
-  const data = fs.readFileSync(`systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
+  const data = fs.readFileSync(`./systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
   let i = 0;
   const obj = JSON.parse(data);
 
@@ -1613,7 +1613,7 @@ client.on('message', (message) => {
     let oldData = new Date();
     oldData = oldData.setDate(oldData.getDate() - daysAgo); // find days prior in ms
     oldData = new Date(oldData); // convert ms to Date object
-    const oldJSON = `systems_populated_${oldData.getMonth() + 1}_${oldData.getDate()}_${oldData.getFullYear()}.json`;
+    const oldJSON = `./systems_populated_${oldData.getMonth() + 1}_${oldData.getDate()}_${oldData.getFullYear()}.json`;
     obj = fs.readFileSync(oldJSON, 'utf8');
     allSystems = [];
     allSystems = JSON.parse(obj);
