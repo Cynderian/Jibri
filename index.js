@@ -1719,14 +1719,12 @@ client.on('message', (message) => {
             finalSystems.push(scoutedSystems[i]);
           }
         }
-        console.log(finalSystems.length)
-        console.log(finalSystems[0])
+
         // sorts
         // delta -> lead
         finalSystems.sort((a, b) => a.lead - b.lead); // sorts systems by lead lowest to highest
         finalSystems.sort((a, b) => a.delta - b.delta); // sorts systems by delta lowest to highest
-        console.log(finalSystems.length)
-        console.log(finalSystems[0])
+
         // outputting
         // test array
         /* const subSystems = [];
