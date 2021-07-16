@@ -234,7 +234,7 @@ function eddbBackup(message, input) {
   let inputX;
   let inputY;
   let inputZ;
-  const data = fs.readFileSync(`./systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
+  const data = fs.readFileSync(`systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
   let i = 0;
   const obj = JSON.parse(data);
 
@@ -1613,7 +1613,7 @@ client.on('message', (message) => {
     let oldData = new Date();
     oldData = oldData.setDate(oldData.getDate() - daysAgo); // find days prior in ms
     oldData = new Date(oldData); // convert ms to Date object
-    const oldJSON = `./systems_populated_${oldData.getMonth() + 1}_${oldData.getDate()}_${oldData.getFullYear()}.json`;
+    const oldJSON = `systems_populated_${oldData.getMonth() + 1}_${oldData.getDate()}_${oldData.getFullYear()}.json`;
     obj = fs.readFileSync(oldJSON, 'utf8');
     allSystems = [];
     allSystems = JSON.parse(obj);
@@ -1706,6 +1706,7 @@ client.on('message', (message) => {
         }
 
         // modify array
+
         for (let i = 0; i < scoutedSystems.length; i++) {
           scoutedSystems[i].updated_at = `${scoutedSystems[i].updated_at.month}/${scoutedSystems[i].updated_at.day}`; // make updated_at displayable
           scoutedSystems[i].delta = (scoutedSystems[i].lead - scoutedSystems[i].lead_old).toFixed(2); // change in lead
@@ -1718,12 +1719,14 @@ client.on('message', (message) => {
             finalSystems.push(scoutedSystems[i]);
           }
         }
-
+        console.log(finalSystems.length)
+        console.log(finalSystems[0])
         // sorts
         // delta -> lead
         finalSystems.sort((a, b) => a.lead - b.lead); // sorts systems by lead lowest to highest
         finalSystems.sort((a, b) => a.delta - b.delta); // sorts systems by delta lowest to highest
-
+        console.log(finalSystems.length)
+        console.log(finalSystems[0])
         // outputting
         // test array
         /* const subSystems = [];
@@ -1736,6 +1739,7 @@ client.on('message', (message) => {
         message.channel.send(`Comparing bgs data from ${today.getMonth() + 1}/${today.getDate() - 1}/${today.getFullYear()} to ${oldData.getMonth() + 1}/${oldData.getDate() - 1}/${oldData.getFullYear()} post-tick`);
 
         let subSystems = [];
+        let x = 0;
         for (let i = 0; i < finalSystems.length; i++) {
           subSystems.push(finalSystems[i]);
           if ((i + 1) % 30 === 0) {
@@ -1743,6 +1747,14 @@ client.on('message', (message) => {
             subSystems = [];
             message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
           }
+          x++;
+        }
+        if (x < 30) {
+          const block = columnify(finalSystems);
+          message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+        } else {
+          const block = columnify(subSystems);
+          message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
         }
 
         // write to txt
