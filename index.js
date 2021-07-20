@@ -441,7 +441,7 @@ client.on('ready', () => {
   console.info('Logged in!');
   client.user.setActivity('All systems online');
   // mirror eddb file and remove the last blank line
-  mirrorEddb(); // commented for testing
+  // mirrorEddb(); // commented for testing
 
   // tick handling
   getURL('https://elitebgs.app/api/ebgs/v5/ticks')
@@ -1585,9 +1585,7 @@ client.on('message', (message) => {
           && allSystems[i].name !== 'Wolfsegen') {
         for (let j = 0; j < controlSystems.length; j++) {
           // all systems within 45ly of any control sphere
-          if (distLessThan(45, allSystems[i].x, allSystems[i].y, allSystems[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z) === true
-          && allSystems[i].power !== 'Aisling Duval'
-          && allSystems[i].government !== 'Corporate') {
+          if (distLessThan(45, allSystems[i].x, allSystems[i].y, allSystems[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z) === true) {
             let copy = 0;
             for (let k = 0; k < potentialSystems.length; k++) {
               if (allSystems[i].name === potentialSystems[k].name) {
@@ -1597,10 +1595,12 @@ client.on('message', (message) => {
             if (copy === 0) {
               const system = {};
               system.name = allSystems[i].name;
+              system.government = allSystems[i].government;
               system.minor_factions_updated_at = allSystems[i].minor_factions_updated_at;
               system.controlling_minor_faction_id = allSystems[i].controlling_minor_faction_id;
               system.minor_faction_presences = allSystems[i].minor_faction_presences;
               system.power = allSystems[i].power;
+              system.power_state = allSystems[i].power_state;
               potentialSystems.push(system);
             }
           }
@@ -1632,20 +1632,26 @@ client.on('message', (message) => {
       }
     }
     for (let i = 0; i < potentialSystems.length; i++) {
+      if (potentialSystems[i].name === 'Niaba') {
+        console.log(potentialSystems[i]);
+      }
       if (scanArea === 'internal' // unfinished, All exploited CCC controlled systems within AD space (the 'castle')
         && potentialSystems[i].power === 'Aisling Duval'
         && (potentialSystems[i].government === 'Communism' || potentialSystems[i].government === 'Cooperative' || potentialSystems[i].government === 'Confederacy')
         && potentialSystems[i].power_state === 'Exploited') {
         // find leads
+        console.log('here');
         const lead = infLeadEddb(potentialSystems, i);
         const leadOld = infLeadEddb(oldSystems, i);
 
         const system = {};
         system.name = potentialSystems[i].name;
         system.lead = lead;
+        system.updated = lastUpdated(potentialSystems[i].minor_factions_updated_at * 1000);
         system.lead_old = leadOld;
-        system.updated_at = lastUpdated(potentialSystems[i].minor_factions_updated_at * 1000);
+        system.updated_old = lastUpdated(oldSystems[i].minor_factions_updated_at * 1000);
         scoutedSystems.push(system);
+        console.log('here');
       } else if (scanArea === 'external' // All systems within the 'moat' around AD space
         && (potentialSystems[i].power === null || potentialSystems[i].power === 'Felicia Winters')
         && potentialSystems[i].government !== 'Corporate'
@@ -1657,8 +1663,9 @@ client.on('message', (message) => {
         const system = {};
         system.name = potentialSystems[i].name;
         system.lead = lead;
+        system.updated = lastUpdated(potentialSystems[i].minor_factions_updated_at * 1000);
         system.lead_old = leadOld;
-        system.updated_at = lastUpdated(potentialSystems[i].minor_factions_updated_at * 1000);
+        system.updated_old = lastUpdated(oldSystems[i].minor_factions_updated_at * 1000);
         scoutedSystems.push(system);
       }
     }
@@ -1693,22 +1700,23 @@ client.on('message', (message) => {
         for (let i = 0; data.length; i++) {
           const ebgsUpdated = lastUpdated(data[i].docs[0].updated_at);
 
-          if (scoutedSystems[i].updated_at.year > ebgsUpdated.year) { // later year
+          if (scoutedSystems[i].updated.year > ebgsUpdated.year) { // later year
             scoutedSystems[i].lead = infLead(data[i]);
-            scoutedSystems[i].updated_at = ebgsUpdated;
-          } else if (scoutedSystems[i].updated_at.year === ebgsUpdated.year && scoutedSystems[i].updated_at.month > ebgsUpdated.month) { // later month
+            scoutedSystems[i].updated = ebgsUpdated;
+          } else if (scoutedSystems[i].updated.year === ebgsUpdated.year && scoutedSystems[i].updated.month > ebgsUpdated.month) { // later month
             scoutedSystems[i].lead = infLead(data[i]);
-            scoutedSystems[i].updated_at = ebgsUpdated;
-          } else if (scoutedSystems[i].updated_at.year === ebgsUpdated.year && scoutedSystems[i].updated_at.month === ebgsUpdated.month && scoutedSystems[i].updated_at.day > ebgsUpdated.day) { // later day
+            scoutedSystems[i].updated = ebgsUpdated;
+          } else if (scoutedSystems[i].updated.year === ebgsUpdated.year && scoutedSystems[i].updated.month === ebgsUpdated.month && scoutedSystems[i].updated.day > ebgsUpdated.day) { // later day
             scoutedSystems[i].lead = infLead(data[i]);
-            scoutedSystems[i].updated_at = ebgsUpdated;
+            scoutedSystems[i].updated = ebgsUpdated;
           }
         }
 
         // modify array
 
         for (let i = 0; i < scoutedSystems.length; i++) {
-          scoutedSystems[i].updated_at = `${scoutedSystems[i].updated_at.month}/${scoutedSystems[i].updated_at.day}`; // make updated_at displayable
+          scoutedSystems[i].updated = `${scoutedSystems[i].updated.month}/${scoutedSystems[i].updated.day}`; // make updated displayable
+          scoutedSystems[i].updated_old = `${scoutedSystems[i].updated_old.month}/${scoutedSystems[i].updated_old.day}`; // make updated_old displayable
           scoutedSystems[i].delta = (scoutedSystems[i].lead - scoutedSystems[i].lead_old).toFixed(2); // change in lead
         }
 
@@ -1740,14 +1748,14 @@ client.on('message', (message) => {
         let x = 0;
         for (let i = 0; i < finalSystems.length; i++) {
           subSystems.push(finalSystems[i]);
-          if ((i + 1) % 30 === 0) {
+          if ((i + 1) % 24 === 0) {
             const block = columnify(subSystems);
             subSystems = [];
             message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
           }
           x++;
         }
-        if (x < 30) {
+        if (x < 24) {
           const block = columnify(finalSystems);
           message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
         } else {
