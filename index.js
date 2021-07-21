@@ -560,6 +560,7 @@ client.on('message', (message) => {
             fs.createReadStream('systems_populated.jsonl')
               .pipe(split(JSON.parse))
               .on('data', (obj) => { // this iterates through every system
+                let tmp = 0;
                 for (let i = 0; i < systemData.length; i++) {
                   // if (obj.id === systemData[i].id) {
                   if (obj.ed_system_address === systemData[i].id) { // workaround
@@ -593,8 +594,9 @@ client.on('message', (message) => {
                     systemData[i].state = obj.power_state;
                     i++;
                   }
-                  if (obj.power === inputPower && obj.power_state === 'Control') {
+                  if (obj.power === inputPower && obj.power_state === 'Control' && tmp === 0) {
                     powerControlSys++;
+                    tmp = 1;
                   }
                 }
               })
@@ -632,6 +634,7 @@ client.on('message', (message) => {
                   const tmp = powerName.split(' ');
                   exploitedCCStr += `Contested with ${tmp[0]}: ${exploitedCC}CC\n`; // Needed for last iteration
                 }
+                console.log(powerControlSys);
                 // math for cc calculations
                 const HQDistance = HQDistances(inputPower, refSysx, refSysy, refSysz);
                 let overhead;
