@@ -155,21 +155,24 @@ function infLead(data, sys = 0) { // only works for ebgs
   return (((inf[0] - inf[1]) * 100).toFixed(2));
 }
 
-function infLeadEddb(data, i) { // inf lead for eddb json
-  let controllingInf = 0;
-  let secondInf = 0;
-  for (let j = 0; j < data[i].minor_faction_presences.length; j++) {
-    if (controllingInf !== 0) {
-      if (data[i].minor_faction_presences[j].influence !== controllingInf && data[i].minor_faction_presences[j].influence > secondInf) {
-        secondInf = data[i].minor_faction_presences[j].influence;
-        break;
+function infLeadEddb(obj, i) { // inf lead for eddb json
+  const factions = [];
+  for (let j = 0; j < obj[i].minor_faction_presences.length; j++) {
+    const faction = {};
+    faction.id = obj[i].minor_faction_presences[j].minor_faction_id;
+    faction.inf = obj[i].minor_faction_presences[j].influence;
+    factions.push(faction);
+  }
+  factions.sort((a, b) => b.inf - a.inf); // sorts systems by lead highest to lowest
+  if (factions[0].id === obj[i].controlling_minor_faction_id) {// if controlling faction is highest inf
+    return (factions[0].inf - factions[1].inf).toFixed(2);
+  } else {
+    for (let j = 0; j < factions.length; j++) {
+      if (factions[j].id === obj[i].controlling_minor_faction_id) {
+        return (factions[j].inf - factions[0].inf).toFixed(2);
       }
-    } else if (controllingInf === 0 && data[i].controlling_minor_faction_id === data[i].minor_faction_presences[j].minor_faction_id) {
-      controllingInf = data[i].minor_faction_presences[j].influence;
-      j = -1;
     }
   }
-  return (controllingInf - secondInf).toFixed(2);
 }
 
 function capitalize(str) {
@@ -1776,18 +1779,75 @@ client.on('message', (message) => {
         const used = process.memoryUsage().heapUsed / 1024 / 1024;
         console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
       });
+  } else if (command === 'faction') {
+    console.log('working on faction');
+    message.channel.send('Calculating...');
+    let scanArea = '';
+    if (!args.length) {
+      return message.channel.send('Please define a faction or power');
+    }
+    /*if (args[0] === power) {
+      isPower = true;
+    } else { isPower = false; }*/
+    let targetFaction = '';
+    if (args[0].slice(0, 1) !== '"' || (args[args.length - 1]).slice(-1) !== '"') {
+      return message.channel.send('Please denote the faction using " "');
+    } else {
+      targetFaction = args[0].slice(1); // first arg
+      for (let i = 1; i < args.length - 1; i++) { // middle args
+        targetFaction += ` ${args[i]}`;
+      }
+      targetFaction += ` ${(args[args.length - 1]).slice(0, -1)}`// last arg
+    }
+    
+    const targetSystems = [];
+    const data = fs.readFileSync(`systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
+    const obj = JSON.parse(data);
+    for(let i = 0; i < obj.length; i++) {
+      if (obj[i].controlling_minor_faction === targetFaction) {
+        const todate = lastUpdated(obj[i].minor_factions_updated_at * 1000);
+        const system = {};
+        system.name = obj[i].name;
+        system.lead = infLeadEddb(obj, i);
+        system.date = `${todate.month}/${todate.day}`;
+        system.pop = popToCC(obj[i].population);
+        targetSystems.push(system);
+      }
+    }
+
+    // sorts
+    targetSystems.sort((a, b) => a.lead - b.lead); // sorts systems by lead lowest to highest
+
+    // output
+    let subSystems = [];
+    let x = 0;
+    for (let i = 0; i < targetSystems.length; i++) {
+      subSystems.push(targetSystems[i]);
+      if ((i + 1) % 24 === 0) {
+        const block = columnify(subSystems);
+        subSystems = [];
+        message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+      }
+      x++;
+    }
+    if (x < 20) {
+      const block = columnify(targetSystems);
+      message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+    } else {
+      const block = columnify(subSystems);
+      message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+    }
   } else if (command === 'help') {
     // readability
-    const version = 'Current Version: 0.9.4';
+    const version = 'Current Version: 0.10.1';
     const preamble = 'All data is as up-to-date as possible via eddb and elitebgs. Jibri can receive dms, and does not log data for any commands given. The default power is Aisling.\n\n';
-    const lead = '~lead <system> takes a system and finds the inf% difference between the controlling faction and the next highest\n';
     const sphere = '~sphere <-o optional> <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead automatically shows control data. Adding -o will make it so the input power name is used regardless of control state. Example: ~sphere Winters Mbambiva\n';
     const multisphere = '~multisphere <system 1> <system 2> ... <system n> shows all systems overlapped by the 15ly spheres of the input systems.\n';
+    const faction = '~faction <faction name OR power> shows all systems in desceding inf lead order belonging to the specified faction (Powers to be implemented later).\n'
     // const threats = '!- Beta Command -! ~threats <friendly power> <hostile power> <distance from main star, in lightseconds> shows all systems with a Large landing pad within an input amount from Aisling space. This command does not currently publicly usable due to the massive amount of data it processes, please ping @Cynder#7567 for use.\n';
-    const tick = '~tick shows the last tick time\n';
-    const cc = '~cc <power> shows the total cc and systems controlled and exploited by a power\n';
+    const cc = '~cc <power> shows the total cc and systems controlled and exploited by a power. Good for confirming if database has been updated.\n';
     const postamble = 'The dates shown reflect when the leads were last updated, and are roughly autocorrected to the last tick time.\n Powerplay info is pulled from EDDB daily at 2am CST\n';
-    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${lead}${sphere}${multisphere}${cc}${tick}\n ${postamble}\`\`\``);
+    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${sphere}${multisphere}${faction}${cc}\n ${postamble}\`\`\``);
   }
 });
 client.login(token);
