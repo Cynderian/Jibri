@@ -164,13 +164,12 @@ function infLeadEddb(obj, i) { // inf lead for eddb json
     factions.push(faction);
   }
   factions.sort((a, b) => b.inf - a.inf); // sorts systems by lead highest to lowest
-  if (factions[0].id === obj[i].controlling_minor_faction_id) {// if controlling faction is highest inf
+  if (factions[0].id === obj[i].controlling_minor_faction_id) { // if controlling faction is highest inf
     return (factions[0].inf - factions[1].inf).toFixed(2);
-  } else {
-    for (let j = 0; j < factions.length; j++) {
-      if (factions[j].id === obj[i].controlling_minor_faction_id) {
-        return (factions[j].inf - factions[0].inf).toFixed(2);
-      }
+  }
+  for (let j = 0; j < factions.length; j++) {
+    if (factions[j].id === obj[i].controlling_minor_faction_id) {
+      return (factions[j].inf - factions[0].inf).toFixed(2);
     }
   }
 }
@@ -1512,19 +1511,6 @@ client.on('message', (message) => {
         console.log(err);
       });
   } else if (command === 'scout') {
-    if (message.author.id !== '182976741373902848' // Cynder
-    && message.author.id !== '173834440227684352' // :ikuo:
-    && message.author.id !== '522888275283673092' // :penguin:
-    && message.author.id !== '100903405358190592' // DivadRex
-    && message.author.id !== '187391406111850496' // AERO
-    && message.author.id !== '209888324930764800' // :ocean:
-    && message.author.id !== '202852077993590785' // :oraki:
-    && message.author.id !== '404662765299433472' // Schielman
-    && message.author.id !== '552524920643518465' // Momomomomo
-    && message.author.id !== '174069540563451905') { // Andalyn
-      console.log('- - Unauthorized command \'scout\' attempted - -');
-      return message.channel.send('You do not have permission to use this command.');
-    }
     console.log('working on scout');
     message.channel.send('Calculating...');
     let scanArea = '';
@@ -1590,7 +1576,7 @@ client.on('message', (message) => {
           && allSystems[i].name !== 'Tyet'
           && allSystems[i].name !== 'Wolfsegen') {
         for (let j = 0; j < controlSystems.length; j++) {
-          // all systems within 45ly of any control sphere
+          // all systems within 45ly of any control sphere (15ly radius internal, 30ly radius external)
           if (distLessThan(45, allSystems[i].x, allSystems[i].y, allSystems[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z) === true) {
             let copy = 0;
             for (let k = 0; k < potentialSystems.length; k++) {
@@ -1607,6 +1593,7 @@ client.on('message', (message) => {
               system.minor_faction_presences = allSystems[i].minor_faction_presences;
               system.power = allSystems[i].power;
               system.power_state = allSystems[i].power_state;
+              system.states = allSystems[i].states;
               potentialSystems.push(system);
             }
           }
@@ -1633,177 +1620,139 @@ client.on('message', (message) => {
           system.controlling_minor_faction_id = allSystems[j].controlling_minor_faction_id;
           system.minor_faction_presences = allSystems[j].minor_faction_presences;
           system.power = allSystems[j].power;
+          system.states = allSystems[j].states;
           oldSystems.push(system);
         }
       }
     }
     for (let i = 0; i < potentialSystems.length; i++) {
-      if (potentialSystems[i].name === 'Niaba') {
-        console.log(potentialSystems[i]);
-      }
-      if (scanArea === 'internal' // unfinished, All exploited CCC controlled systems within AD space (the 'castle')
+      if (scanArea === 'internal' // All exploited CCC controlled systems within AD space (the 'castle')
         && potentialSystems[i].power === 'Aisling Duval'
         && (potentialSystems[i].government === 'Communism' || potentialSystems[i].government === 'Cooperative' || potentialSystems[i].government === 'Confederacy')
         && potentialSystems[i].power_state === 'Exploited') {
-        // find leads
-        console.log('here');
-        const lead = infLeadEddb(potentialSystems, i);
-        const leadOld = infLeadEddb(oldSystems, i);
-
         const system = {};
         system.name = potentialSystems[i].name;
-        system.lead = lead;
+        system.lead = infLeadEddb(potentialSystems, i);
         system.updated = lastUpdated(potentialSystems[i].minor_factions_updated_at * 1000);
-        system.lead_old = leadOld;
+        system.lead_old = infLeadEddb(oldSystems, i);
         system.updated_old = lastUpdated(oldSystems[i].minor_factions_updated_at * 1000);
-        scoutedSystems.push(system);
-        console.log('here');
+        system.delta = (infLeadEddb(potentialSystems, i) - infLeadEddb(oldSystems, i)); // change in lead
+
+        for (let j = 0; j < (oldSystems[i].states).length; j++) { // account for expansion pop
+          if (oldSystems[i].states[j].name === 'Expansion') {
+            for (let k = 0; k < (potentialSystems[i].states).length; k++) {
+              if (potentialSystems[i].states[k].name !== 'Expansion') {
+                system.delta += 15;
+              }
+            }
+          }
+        }
+        if (Date.parse(`${system.updated_old.year}-${system.updated_old.month}-${system.updated_old.day}`) + 172800000 + 86400000 * daysAgo
+          >= Date.parse(`${system.updated.year}-${system.updated.month}-${system.updated.day}`)) { // no entries more than 2 days out of date
+          scoutedSystems.push(system);
+        }
       } else if (scanArea === 'external' // All systems within the 'moat' around AD space
         && (potentialSystems[i].power === null || potentialSystems[i].power === 'Felicia Winters')
         && potentialSystems[i].government !== 'Corporate'
         && potentialSystems[i].power_state !== 'Contested') {
-        // find leads
-        const lead = infLeadEddb(potentialSystems, i);
-        const leadOld = infLeadEddb(oldSystems, i);
-
         const system = {};
         system.name = potentialSystems[i].name;
-        system.lead = lead;
+        system.lead = infLeadEddb(potentialSystems, i);
         system.updated = lastUpdated(potentialSystems[i].minor_factions_updated_at * 1000);
-        system.lead_old = leadOld;
+        system.lead_old = infLeadEddb(oldSystems, i);
         system.updated_old = lastUpdated(oldSystems[i].minor_factions_updated_at * 1000);
-        scoutedSystems.push(system);
+        system.delta = (infLeadEddb(potentialSystems, i) - infLeadEddb(oldSystems, i)); // change in lead
+
+        for (let j = 0; j < (oldSystems[i].states).length; j++) { // account for expansion pop
+          if (oldSystems[i].states[j].name === 'Expansion') {
+            for (let k = 0; k < (potentialSystems[i].states).length; k++) {
+              if (potentialSystems[i].states[k].name !== 'Expansion') {
+                system.delta += 15;
+              }
+            }
+          }
+        }
+
+        if (Date.parse(`${system.updated_old.year}-${system.updated_old.month}-${system.updated_old.day}`) + 86400 * (2 + daysAgo)
+          <= Date.parse(`${system.updated.year}-${system.updated.month}-${system.updated.day}`)) { // no entries more than 2 days out of date
+          scoutedSystems.push(system);
+        }
       }
     }
 
-    const testSystems = [];
-    for (let i = 0; i < 1; i++) {
-      testSystems.push(scoutedSystems[i]);
-    }
-    /* testing
-    const ebgsPromises = [];
-    for (let i = 0; i < testSystems.length; i++) {
-      const fetchName = testSystems[i].name;
-      const delay = i * 200;
-      const promise = new Promise((resolve) => setTimeout(resolve, delay)).then(() => fetch(`https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&referenceSystem=${fetchName}`));
-      ebgsPromises.push(promise);
-    }
-    */
-    const ebgsPromises = [];
-    /* temp while tick is bleh
+    // modify array
     for (let i = 0; i < scoutedSystems.length; i++) {
-      const fetchName = scoutedSystems[i].name;
-      const delay = i * 200;
-      const promise = new Promise((resolve) => setTimeout(resolve, delay)).then(() => fetch(`https://elitebgs.app/api/ebgs/v5/systems?factionDetails=true&referenceSystem=${fetchName}`));
-      ebgsPromises.push(promise);
+      scoutedSystems[i].updated = `${scoutedSystems[i].updated.month}/${scoutedSystems[i].updated.day}`; // make updated displayable
+      scoutedSystems[i].updated_old = `${scoutedSystems[i].updated_old.month}/${scoutedSystems[i].updated_old.day}`; // make updated_old displayable
+      scoutedSystems[i].delta = (scoutedSystems[i].delta).toFixed(2); // set to 100ths place
     }
-    */
-    console.log(`fetching ${scoutedSystems.length} promises, this will take approximately ${(ebgsPromises.length * (2 / 10) + 5).toFixed(1)} seconds\n`);
-    Promise.all(ebgsPromises)
-      .then((responses) => {
-        const data = Promise.all(responses.map((response) => response.json()));
-        console.log('processing data');
-        for (let i = 0; data.length; i++) {
-          const ebgsUpdated = lastUpdated(data[i].docs[0].updated_at);
 
-          if (scoutedSystems[i].updated.year > ebgsUpdated.year) { // later year
-            scoutedSystems[i].lead = infLead(data[i]);
-            scoutedSystems[i].updated = ebgsUpdated;
-          } else if (scoutedSystems[i].updated.year === ebgsUpdated.year && scoutedSystems[i].updated.month > ebgsUpdated.month) { // later month
-            scoutedSystems[i].lead = infLead(data[i]);
-            scoutedSystems[i].updated = ebgsUpdated;
-          } else if (scoutedSystems[i].updated.year === ebgsUpdated.year && scoutedSystems[i].updated.month === ebgsUpdated.month && scoutedSystems[i].updated.day > ebgsUpdated.day) { // later day
-            scoutedSystems[i].lead = infLead(data[i]);
-            scoutedSystems[i].updated = ebgsUpdated;
-          }
-        }
+    // make final array
+    const finalSystems = [];
+    for (let i = 0; i < scoutedSystems.length; i++) {
+      if (Number(scoutedSystems[i].delta) <= -5) {
+        finalSystems.push(scoutedSystems[i]);
+      }
+    }
 
-        // modify array
+    // sorts
+    // delta -> lead
+    finalSystems.sort((a, b) => a.lead - b.lead); // sorts systems by lead lowest to highest
+    finalSystems.sort((a, b) => a.delta - b.delta); // sorts systems by delta lowest to highest
 
-        for (let i = 0; i < scoutedSystems.length; i++) {
-          scoutedSystems[i].updated = `${scoutedSystems[i].updated.month}/${scoutedSystems[i].updated.day}`; // make updated displayable
-          scoutedSystems[i].updated_old = `${scoutedSystems[i].updated_old.month}/${scoutedSystems[i].updated_old.day}`; // make updated_old displayable
-          scoutedSystems[i].delta = (scoutedSystems[i].lead - scoutedSystems[i].lead_old).toFixed(2); // change in lead
-        }
+    message.channel.send(`Comparing bgs data from ${today.getMonth() + 1}/${today.getDate() - 1}/${today.getFullYear()} to ${oldData.getMonth() + 1}/${oldData.getDate() - 1}/${oldData.getFullYear()} post-tick`);
 
-        // make final array
-        const finalSystems = [];
-        for (let i = 0; i < scoutedSystems.length; i++) {
-          if (Number(scoutedSystems[i].delta) <= -5) {
-            finalSystems.push(scoutedSystems[i]);
-          }
-        }
-
-        // sorts
-        // delta -> lead
-        finalSystems.sort((a, b) => a.lead - b.lead); // sorts systems by lead lowest to highest
-        finalSystems.sort((a, b) => a.delta - b.delta); // sorts systems by delta lowest to highest
-
-        // outputting
-        // test array
-        /* const subSystems = [];
-        for (let i = 0; i < 5; i++) {
-          subSystems.push(scoutedSystems[i]);
-        }
+    let subSystems = [];
+    let x = 0;
+    for (let i = 0; i < finalSystems.length; i++) {
+      subSystems.push(finalSystems[i]);
+      if ((i + 1) % 24 === 0) {
         const block = columnify(subSystems);
+        subSystems = [];
         message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
-        */
-        message.channel.send(`Comparing bgs data from ${today.getMonth() + 1}/${today.getDate() - 1}/${today.getFullYear()} to ${oldData.getMonth() + 1}/${oldData.getDate() - 1}/${oldData.getFullYear()} post-tick`);
+      }
+      x++;
+    }
+    if (x < 24) {
+      const block = columnify(finalSystems);
+      message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+    } else {
+      const block = columnify(subSystems);
+      message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+    }
 
-        let subSystems = [];
-        let x = 0;
-        for (let i = 0; i < finalSystems.length; i++) {
-          subSystems.push(finalSystems[i]);
-          if ((i + 1) % 24 === 0) {
-            const block = columnify(subSystems);
-            subSystems = [];
-            message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
-          }
-          x++;
-        }
-        if (x < 24) {
-          const block = columnify(finalSystems);
-          message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
-        } else {
-          const block = columnify(subSystems);
-          message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
-        }
+    // write to txt
+    fs.writeFile(`scout_${daysAgo}.txt`, columnify(finalSystems), (err) => {
+      if (err) return console.log(err);
+      console.log('file successfully saved');
+    });
 
-        // write to txt
-        fs.writeFile(`scout_${daysAgo}.txt`, columnify(finalSystems), (err) => {
-          if (err) return console.log(err);
-          console.log('file successfully saved');
-        });
-
-        // mem usage
-        const used = process.memoryUsage().heapUsed / 1024 / 1024;
-        console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
-      });
+    // mem usage
+    const used = process.memoryUsage().heapUsed / 1024 / 1024;
+    console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
   } else if (command === 'faction') {
     console.log('working on faction');
     message.channel.send('Calculating...');
-    let scanArea = '';
     if (!args.length) {
       return message.channel.send('Please define a faction or power');
     }
-    /*if (args[0] === power) {
+    /* if (args[0] === power) {
       isPower = true;
-    } else { isPower = false; }*/
+    } else { isPower = false; } */
     let targetFaction = '';
     if (args[0].slice(0, 1) !== '"' || (args[args.length - 1]).slice(-1) !== '"') {
       return message.channel.send('Please denote the faction using " "');
-    } else {
-      targetFaction = args[0].slice(1); // first arg
-      for (let i = 1; i < args.length - 1; i++) { // middle args
-        targetFaction += ` ${args[i]}`;
-      }
-      targetFaction += ` ${(args[args.length - 1]).slice(0, -1)}`// last arg
     }
-    
+    targetFaction = args[0].slice(1); // first arg
+    for (let i = 1; i < args.length - 1; i++) { // middle args
+      targetFaction += ` ${args[i]}`;
+    }
+    targetFaction += ` ${(args[args.length - 1]).slice(0, -1)}`;// last arg
+
     const targetSystems = [];
     const data = fs.readFileSync(`systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
     const obj = JSON.parse(data);
-    for(let i = 0; i < obj.length; i++) {
+    for (let i = 0; i < obj.length; i++) {
       if (obj[i].controlling_minor_faction === targetFaction) {
         const todate = lastUpdated(obj[i].minor_factions_updated_at * 1000);
         const system = {};
@@ -1839,15 +1788,16 @@ client.on('message', (message) => {
     }
   } else if (command === 'help') {
     // readability
-    const version = 'Current Version: 0.10.1';
+    const version = 'Current Version: 0.10.2';
     const preamble = 'All data is as up-to-date as possible via eddb and elitebgs. Jibri can receive dms, and does not log data for any commands given. The default power is Aisling.\n\n';
     const sphere = '~sphere <-o optional> <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead automatically shows control data. Adding -o will make it so the input power name is used regardless of control state. Example: ~sphere Winters Mbambiva\n';
     const multisphere = '~multisphere <system 1> <system 2> ... <system n> shows all systems overlapped by the 15ly spheres of the input systems.\n';
-    const faction = '~faction <faction name OR power> shows all systems in desceding inf lead order belonging to the specified faction (Powers to be implemented later).\n'
+    const scout = '~scout <internal/external> <days> compares current data to user-defined days old data to find any significant lead changes, for all CCC systems within AD space, or all systems witing 30ly external to AD space. Automatically adjusts for expansion state resolutions, and trims data more than 2 days out of date.\n';
+    const faction = '~faction <faction name OR power> shows all systems in desceding inf lead order belonging to the specified faction (Powers to be implemented later).\n';
     // const threats = '!- Beta Command -! ~threats <friendly power> <hostile power> <distance from main star, in lightseconds> shows all systems with a Large landing pad within an input amount from Aisling space. This command does not currently publicly usable due to the massive amount of data it processes, please ping @Cynder#7567 for use.\n';
     const cc = '~cc <power> shows the total cc and systems controlled and exploited by a power. Good for confirming if database has been updated.\n';
     const postamble = 'The dates shown reflect when the leads were last updated, and are roughly autocorrected to the last tick time.\n Powerplay info is pulled from EDDB daily at 2am CST\n';
-    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${sphere}${multisphere}${faction}${cc}\n ${postamble}\`\`\``);
+    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${sphere}${multisphere}${scout}${faction}${cc}\n ${postamble}\`\`\``);
   }
 });
 client.login(token);
