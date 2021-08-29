@@ -42,7 +42,7 @@ function inputPowerFilter(message, input) {
     return 'Zemina Torval';
   } else if (casedInput === 'rranav' || casedInput === 'antal') {
     return 'Pranav Antal';
-  } else if (casedInput === 'aisling' || casedInput === 'aisling duval') {
+  } else if (casedInput === 'aisling' || casedInput === 'aisling duval' || casedInput === 'ad') {
     return 'Aisling Duval';
   } else {
     return undefined;
@@ -169,7 +169,7 @@ function infLeadEddb(obj, i) { // inf lead for eddb json
   }
   for (let j = 0; j < factions.length; j++) {
     if (factions[j].id === obj[i].controlling_minor_faction_id) {
-      return (factions[j].inf - factions[0].inf).toFixed(2);
+      return Number((factions[j].inf - factions[0].inf).toFixed(2));
     }
   }
 }
@@ -443,7 +443,7 @@ client.on('ready', () => {
   console.info('Logged in!');
   client.user.setActivity('All systems online');
   // mirror eddb file and remove the last blank line
-  mirrorEddb(); // commented for testing
+  // mirrorEddb(); // commented for testing
 
   // tick handling
   getURL('https://elitebgs.app/api/ebgs/v5/ticks')
@@ -1517,33 +1517,41 @@ client.on('message', (message) => {
     if (!args.length) {
       return message.channel.send('Please define internal or external');
     }
-    if (args[0] === 'internal' || args[0] === 'external') {
-      scanArea = args[0];
-    } else {
-      return message.channel.send('Please define internal or external');
-    }
-    if (!args[1]) {
-      return message.channel.send('Please specify how many days ago to compare data to');
-    }
-    let daysAgo = Number(args[1]);
-    if (!Number.isNaN(args[1]) && args[1] < 6 && args[1] > 0) {
-      daysAgo = args[1];
-    } else {
-      return message.channel.send('Please specify how many days ago to compare data to');
-    }
-
-    /* power-dynamic option instead of just Aisling
+    // power-dynamic option
     let input = '';
-    if (!args.length) { // take all input after command and designate it the target power
+    if (!args.length) {
       return message.channel.send('Please define a first reference power.');
     }
+    // Override to ignore system control state
+    let overrideProfitables = 0;
+    if (args[0] === '-profitables') {
+      console.log('profitables override enabled');
+      overrideProfitables = 1;
+      args.shift();
+    }
+    // power assignment
     input = args[0]; // start at first argument to avoid an extra ' ' from for loop
     input = capitalize(removeQuotes(input)); // if input is seperated with "", remove them for processing
     input = inputPowerFilter(message, input);
     if (input === undefined) {
-      return message.channel.send('Error reading first power name, please try again');
-    } */
-    const input = 'Aisling Duval';
+      return message.channel.send('Error reading power name, please try again');
+    }
+    // in/out
+    if (args[1] === 'internal' || args[1] === 'external') {
+      scanArea = args[1];
+    } else {
+      return message.channel.send('Please define internal or external');
+    }
+    if (!args[2]) {
+      return message.channel.send('Please specify how many days ago to compare data to');
+    }
+    let daysAgo = Number(args[2]);
+    if (!Number.isNaN(args[2]) && args[2] < 6 && args[2] > 0) {
+      daysAgo = args[2];
+    } else {
+      return message.channel.send('Please specify how many days ago to compare data to');
+    }
+
     console.log(`systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`);
     let obj = fs.readFileSync(`systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
     let allSystems = JSON.parse(obj);
@@ -1556,12 +1564,47 @@ client.on('message', (message) => {
         controlSystem.x = allSystems[i].x;
         controlSystem.y = allSystems[i].y;
         controlSystem.z = allSystems[i].z;
-        controlSystems.push(controlSystem);
+
+        if (overrideProfitables === 0) {
+          controlSystems.push(controlSystem);
+        } else {
+          let grossCC = 0;
+          for (let j = 0; j < allSystems.length; j++) {
+            if (allSystems[i].population > 0
+              && allSystems[i].name !== 'Shinrarta Dezhra' // you know where this is
+              && allSystems[i].name !== 'Azoth' // 10 starter systems
+              && allSystems[i].name !== 'Dromi'
+              && allSystems[i].name !== 'Lia Fall'
+              && allSystems[i].name !== 'Matet'
+              && allSystems[i].name !== 'Orna'
+              && allSystems[i].name !== 'Otegine'
+              && allSystems[i].name !== 'Sharur'
+              && allSystems[i].name !== 'Tarnkappe'
+              && allSystems[i].name !== 'Tyet'
+              && allSystems[i].name !== 'Wolfsegen'
+              && distLessThan(15, allSystems[j].x, allSystems[j].y, allSystems[j].z, controlSystem.x, controlSystem.y, controlSystem.z) === true) {
+              grossCC += popToCC(allSystems[j].population);
+            }
+          }
+          const HQDistance = HQDistances(input, controlSystem.x, controlSystem.y, controlSystem.z);
+          const overhead = (Math.min(((11.5 * (55)) / 42) ** 3, 5.4 * 11.5 * 55)) / 55;
+          const upkeep = Math.ceil((HQDistance ** 2) * 0.001 + 20);
+          const netCC = grossCC - overhead - upkeep;
+          if (netCC > 0) {
+            controlSystems.push(controlSystem);
+          }
+        }
       }
     }
     console.log(`${controlSystems.length} control systems fetched`);
     // find all systems within the input range
     const potentialSystems = [];
+    let range = 0;
+    if (scanArea === 'internal') {
+      range = 15;
+    } else if (scanArea === 'external') {
+      range = 45;
+    }
     for (let i = 0; i < allSystems.length; i++) {
       if (allSystems[i].population > 0
           && allSystems[i].name !== 'Shinrarta Dezhra' // you know where this is
@@ -1577,7 +1620,7 @@ client.on('message', (message) => {
           && allSystems[i].name !== 'Wolfsegen') {
         for (let j = 0; j < controlSystems.length; j++) {
           // all systems within 45ly of any control sphere (15ly radius internal, 30ly radius external)
-          if (distLessThan(45, allSystems[i].x, allSystems[i].y, allSystems[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z) === true) {
+          if (distLessThan(range, allSystems[i].x, allSystems[i].y, allSystems[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z) === true) {
             let copy = 0;
             for (let k = 0; k < potentialSystems.length; k++) {
               if (allSystems[i].name === potentialSystems[k].name) {
@@ -1600,8 +1643,10 @@ client.on('message', (message) => {
         }
       }
     }
+
     console.log(`${potentialSystems.length} potential systems found`);
     const scoutedSystems = [];
+    const dangerSystems = [];
     // recreate potential systems list using old data for compairson
     let oldData = new Date();
     oldData = oldData.setDate(oldData.getDate() - daysAgo); // find days prior in ms
@@ -1627,33 +1672,49 @@ client.on('message', (message) => {
     }
     for (let i = 0; i < potentialSystems.length; i++) {
       if (scanArea === 'internal' // All exploited CCC controlled systems within AD space (the 'castle')
-        && potentialSystems[i].power === 'Aisling Duval'
-        && (potentialSystems[i].government === 'Communism' || potentialSystems[i].government === 'Cooperative' || potentialSystems[i].government === 'Confederacy')
+        && potentialSystems[i].power === input
         && potentialSystems[i].power_state === 'Exploited') {
-        const system = {};
-        system.name = potentialSystems[i].name;
-        system.lead = infLeadEddb(potentialSystems, i);
-        system.updated = lastUpdated(potentialSystems[i].minor_factions_updated_at * 1000);
-        system.lead_old = infLeadEddb(oldSystems, i);
-        system.updated_old = lastUpdated(oldSystems[i].minor_factions_updated_at * 1000);
-        system.delta = (infLeadEddb(potentialSystems, i) - infLeadEddb(oldSystems, i)); // change in lead
+        if (((input === 'Aisling Duval' || input === 'Archon Delaine')
+                && (potentialSystems[i].government === 'Communism' || potentialSystems[i].government === 'Cooperative' || potentialSystems[i].government === 'Confederacy'))
+              || ((input === 'Arissa Lavigny-Duval' || input === 'Denton Patreus' || input === 'Zachary Hudson')
+                && (potentialSystems[i].government === 'Feudal' || potentialSystems[i].government === 'Patronage'))
+              || ((input === 'Edmund Mahon' || input === 'Felicia Winters' || input === 'Li Yong-Rui')
+                && (potentialSystems[i].government === 'Corporate'))
+              || ((input === 'Pranav Antal' || input === 'Zemina Torval' || input === 'Yuri Grom')
+                && (potentialSystems[i].government === 'Feudal' || potentialSystems[i].government === 'Communism' || potentialSystems[i].government === 'Dictatorship' || potentialSystems[i].government === 'Cooperative'))) {
+          const system = {};
+          system.name = potentialSystems[i].name;
+          system.lead = infLeadEddb(potentialSystems, i);
+          system.updated = lastUpdated(potentialSystems[i].minor_factions_updated_at * 1000);
+          system.lead_old = infLeadEddb(oldSystems, i);
+          system.updated_old = lastUpdated(oldSystems[i].minor_factions_updated_at * 1000);
+          system.delta = (infLeadEddb(potentialSystems, i) - infLeadEddb(oldSystems, i)); // change in lead
 
-        for (let j = 0; j < (oldSystems[i].states).length; j++) { // account for expansion pop
-          if (oldSystems[i].states[j].name === 'Expansion') {
-            for (let k = 0; k < (potentialSystems[i].states).length; k++) {
-              if (potentialSystems[i].states[k].name !== 'Expansion') {
-                system.delta += 15;
+          for (let j = 0; j < (oldSystems[i].states).length; j++) { // account for expansion pop
+            if (oldSystems[i].states[j].name === 'Expansion') {
+              for (let k = 0; k < (potentialSystems[i].states).length; k++) {
+                if (potentialSystems[i].states[k].name !== 'Expansion') {
+                  system.delta += 15;
+                }
               }
             }
           }
-        }
-        if (Date.parse(`${system.updated_old.year}-${system.updated_old.month}-${system.updated_old.day}`) + 172800000 + 86400000 * daysAgo
-          >= Date.parse(`${system.updated.year}-${system.updated.month}-${system.updated.day}`)) { // no entries more than 2 days out of date
-          scoutedSystems.push(system);
+
+          // pass objects to arrays
+          if (Date.parse(`${system.updated_old.year}-${system.updated_old.month}-${system.updated_old.day}`) + 172800000 + 86400000 * daysAgo
+            >= Date.parse(`${system.updated.year}-${system.updated.month}-${system.updated.day}`)) { // no entries more than 2 days out of date
+            scoutedSystems.push(system);
+          }
+          if (system.lead < 20) {
+            const tmpsystem = {};
+            tmpsystem.name = system.name;
+            tmpsystem.lead = system.lead;
+            tmpsystem.updated = system.updated;
+            dangerSystems.push(tmpsystem);
+          }
         }
       } else if (scanArea === 'external' // All systems within the 'moat' around AD space
-        && (potentialSystems[i].power === null || potentialSystems[i].power === 'Felicia Winters')
-        && potentialSystems[i].government !== 'Corporate'
+        && potentialSystems[i].power !== input
         && potentialSystems[i].power_state !== 'Contested') {
         const system = {};
         system.name = potentialSystems[i].name;
@@ -1685,6 +1746,10 @@ client.on('message', (message) => {
       scoutedSystems[i].updated_old = `${scoutedSystems[i].updated_old.month}/${scoutedSystems[i].updated_old.day}`; // make updated_old displayable
       scoutedSystems[i].delta = (scoutedSystems[i].delta).toFixed(2); // set to 100ths place
     }
+    
+    for (let i = 0; i < dangerSystems.length; i++) {
+      dangerSystems[i].updated = `${dangerSystems[i].updated.month}/${dangerSystems[i].updated.day}`; // make updated displayable
+    }
 
     // make final array
     const finalSystems = [];
@@ -1698,9 +1763,11 @@ client.on('message', (message) => {
     // delta -> lead
     finalSystems.sort((a, b) => a.lead - b.lead); // sorts systems by lead lowest to highest
     finalSystems.sort((a, b) => a.delta - b.delta); // sorts systems by delta lowest to highest
+    // lead
+    dangerSystems.sort((a, b) => a.lead - b.lead); // sorts systems by lead lowest to highest
 
+    // print significant deltas
     message.channel.send(`Comparing bgs data from ${today.getMonth() + 1}/${today.getDate() - 1}/${today.getFullYear()} to ${oldData.getMonth() + 1}/${oldData.getDate() - 1}/${oldData.getFullYear()} post-tick`);
-
     let subSystems = [];
     let x = 0;
     for (let i = 0; i < finalSystems.length; i++) {
@@ -1712,7 +1779,9 @@ client.on('message', (message) => {
       }
       x++;
     }
-    if (x < 24) {
+    if (x === 0) {
+      message.channel.send('`No systems found`');
+    } else if (x < 24) {
       const block = columnify(finalSystems);
       message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
     } else {
@@ -1720,11 +1789,28 @@ client.on('message', (message) => {
       message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
     }
 
-    // write to txt
-    fs.writeFile(`scout_${daysAgo}.txt`, columnify(finalSystems), (err) => {
-      if (err) return console.log(err);
-      console.log('file successfully saved');
-    });
+    // print systems with leads <20
+    message.channel.send('Systems with leads <20 inf');
+    subSystems = [];
+    x = 0;
+    for (let i = 0; i < dangerSystems.length; i++) {
+      subSystems.push(dangerSystems[i]);
+      if ((i + 1) % 24 === 0) {
+        const block = columnify(subSystems);
+        subSystems = [];
+        message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+      }
+      x++;
+    }
+    if (x === 0) {
+      message.channel.send('`No systems found`');
+    } else if (x < 24) {
+      const block = columnify(dangerSystems);
+      message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+    } else {
+      const block = columnify(subSystems);
+      message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+    }
 
     // mem usage
     const used = process.memoryUsage().heapUsed / 1024 / 1024;
@@ -1735,9 +1821,7 @@ client.on('message', (message) => {
     if (!args.length) {
       return message.channel.send('Please define a faction or power');
     }
-    /* if (args[0] === power) {
-      isPower = true;
-    } else { isPower = false; } */
+
     let targetFaction = '';
     if (args[0].slice(0, 1) !== '"' || (args[args.length - 1]).slice(-1) !== '"') {
       return message.channel.send('Please denote the faction using " "');
@@ -1785,18 +1869,21 @@ client.on('message', (message) => {
       const block = columnify(subSystems);
       message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
     }
+  } else if (command === 'profitables') {
+
   } else if (command === 'help') {
     // readability
     const version = 'Current Version: 0.10.2';
     const preamble = 'All data is as up-to-date as possible via eddb and elitebgs. Jibri can receive dms, and does not log data for any commands given. The default power is Aisling.\n\n';
-    const sphere = '~sphere <-o optional> <power (optional)> <system> designates a system as a midpoint, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead automatically shows control data. Adding -o will make it so the input power name is used regardless of control state. Example: ~sphere Winters Mbambiva\n';
+    const sphere = '~sphere <-o optional> <power> <system> designates a system as a midpoint, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead automatically shows control data. Adding -o will make it so the input power name is used regardless of control state. Example: ~sphere Winters Mbambiva\n';
     const multisphere = '~multisphere <system 1> <system 2> ... <system n> shows all systems overlapped by the 15ly spheres of the input systems.\n';
-    const scout = '~scout <internal/external> <days> compares current data to user-defined days old data to find any significant lead changes, for all CCC systems within AD space, or all systems witing 30ly external to AD space. Automatically adjusts for expansion state resolutions, and trims data more than 2 days out of date.\n';
+    const scout = '~scout <-profitables optional> <power> <internal/external> <days> compares current data to user-defined days old data to find any significant lead changes, for all CCC systems within AD space, or all systems witing 30ly external to AD space. Automatically adjusts for expansion state resolutions, and trims data more than 2 days out of date. Only \'internal\' is power-flexible. -profitables only checks profitable spheres (at max OH)\n';
     const faction = '~faction <faction name OR power> shows all systems in desceding inf lead order belonging to the specified faction (Powers to be implemented later).\n';
+    const profitables = '~profitables <power> shows all existing profitable expansions for a power';
     // const threats = '!- Beta Command -! ~threats <friendly power> <hostile power> <distance from main star, in lightseconds> shows all systems with a Large landing pad within an input amount from Aisling space. This command does not currently publicly usable due to the massive amount of data it processes, please ping @Cynder#7567 for use.\n';
     const cc = '~cc <power> shows the total cc and systems controlled and exploited by a power. Good for confirming if database has been updated.\n';
     const postamble = 'The dates shown reflect when the leads were last updated, and are roughly autocorrected to the last tick time.\n Powerplay info is pulled from EDDB daily at 2am CST\n';
-    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${sphere}${multisphere}${scout}${faction}${cc}\n ${postamble}\`\`\``);
+    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${sphere}${multisphere}${scout}${faction}${profitables}${cc}\n ${postamble}\`\`\``);
   }
 });
 client.login(token);
