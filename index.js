@@ -443,7 +443,7 @@ client.on('ready', () => {
   console.info('Logged in!');
   client.user.setActivity('All systems online');
   // mirror eddb file and remove the last blank line
-  // mirrorEddb(); // commented for testing
+  mirrorEddb(); // commented for testing
 
   // tick handling
   getURL('https://elitebgs.app/api/ebgs/v5/ticks')
