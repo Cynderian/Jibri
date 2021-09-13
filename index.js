@@ -377,6 +377,12 @@ client.on('message', (message) => {
 	if (!message.content.startsWith(prefix) || message.author.bot) return;
 	const args = message.content.slice(prefix.length).trim().split(/ +/);
 	const command = args.shift().toLowerCase();
+  let trackedCommandStr = `User ${message.author.id} (${message.author.username}) used command ~${command}`;
+  for (let i = 0; i < args.length; i++) {
+    trackedCommandStr += ` ${args[i]}`;
+  }
+  fs.appendFile('./data/user_log.txt', `${trackedCommandStr}\n`, function(err) { if (err) throw err; });
+  console.log(trackedCommandStr);
     if (command === 'sphere') {
 		console.log('working on sphere');
 		message.channel.send('Calculating...');
@@ -839,7 +845,18 @@ client.on('message', (message) => {
 		const used = process.memoryUsage().heapUsed / 1024 / 1024;
 		console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
 	} else if (command === 'threats') {
-		if (message.author.id !== '182976741373902848') { // only Cynder#7567 can use this
+		if (message.author.id !== '182976741373902848' // Cynder
+    || message.author.id !== '187391406111850496' // Aero
+    || message.author.id !== '202852077993590785' // Oraki
+    || message.author.id !== '522888275283673092' // Gwar
+    || message.author.id !== '552524920643518465' // Momo
+    || message.author.id !== '209888324930764800' // :ocean:
+    || message.author.id !== '174069540563451905' // Andalyn
+    || message.author.id !== '100903405358190592' // DivadREX
+    || message.author.id !== '256475063975542784' // Bones
+    || message.author.id !== '173834440227684352' // Ikuo
+    || message.author.id !== '404662765299433472' // Schielman
+    || message.author.id !== '133358103201710080') { // Mantis
 			console.log('- - Unauthorized command \'threats\' attempted - -');
 			return message.channel.send('You do not have permission to use this command.');
 		}
@@ -1099,6 +1116,21 @@ client.on('message', (message) => {
 		const used = process.memoryUsage().heapUsed / 1024 / 1024;
 		console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
 	} else if (command === 'profitables') {
+    if (message.author.id !== '182976741373902848' // Cynder
+    || message.author.id !== '187391406111850496' // Aero
+    || message.author.id !== '202852077993590785' // Oraki
+    || message.author.id !== '522888275283673092' // Gwar
+    || message.author.id !== '552524920643518465' // Momo
+    || message.author.id !== '209888324930764800' // :ocean:
+    || message.author.id !== '174069540563451905' // Andalyn
+    || message.author.id !== '100903405358190592' // DivadREX
+    || message.author.id !== '256475063975542784' // Bones
+    || message.author.id !== '173834440227684352' // Ikuo
+    || message.author.id !== '404662765299433472' // Schielman
+    || message.author.id !== '133358103201710080') { // Mantis
+			console.log('- - Unauthorized command \'threats\' attempted - -');
+			return message.channel.send('You do not have permission to use this command.');
+		}
 		console.log('working on profitables');
 		message.channel.send('Calculating...');
 		// power-dynamic option
