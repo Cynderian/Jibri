@@ -168,6 +168,10 @@ function favorability(power, government, state, systemPower, type) {
       }
       return 'neutral';
     }
+    // Control Contested Systems
+    if (state === 'Contested') {
+      return 0;
+    }
   }
   // Expansion Ethos
   if (type === 'Expansion') {
@@ -201,10 +205,10 @@ function favorability(power, government, state, systemPower, type) {
       }
       return 'neutral';
     }
-  }
-  // Contested Systems
-  if (state === 'Contested' || state === 'Control' || (type === 'Expansion' && state === 'Exploited' && systemPower !== power)) {
-    return 0;
+    // Expansion Contested Systems
+    if (state !== null) {
+      return 0;
+    }
   }
   // Error
   return -1;
@@ -423,14 +427,26 @@ client.on('message', (message) => {
 
     // find input system's coords to use in distLessThan
     let sphereType = 'Expansion';
-    const sphereCoords = {};
+    const controlSphereSystem = {};
     // central system to base sphere off of
 		for (let i = 0; i < allSystems.length; i++) {
 			if (sphere === (allSystems[i].name).toLowerCase()) {
         sphere = allSystems[i].name;
-				sphereCoords.x = allSystems[i].x;
-				sphereCoords.y = allSystems[i].y;
-				sphereCoords.z = allSystems[i].z;
+
+        // add to control data object to insert later
+        const lastTick = lastUpdated(allSystems[i].minor_factions_updated_at * 1000); // convert from unix timestamp
+
+				controlSphereSystem.x = allSystems[i].x;
+				controlSphereSystem.y = allSystems[i].y;
+				controlSphereSystem.z = allSystems[i].z;
+        controlSphereSystem.name = allSystems[i].name;
+        controlSphereSystem.government = allSystems[i].government;
+        controlSphereSystem.lead = infLead(allSystems[i]);
+        controlSphereSystem.date = `${lastTick.month}/${lastTick.day}`;
+        controlSphereSystem.cc = popToCC(allSystems[i].population);
+        controlSphereSystem.power = allSystems[i].power;
+        controlSphereSystem.state = allSystems[i].power_state;
+
         if (allSystems[i].power_state === 'Control') {
           sphereType = 'Control';
         }
@@ -444,11 +460,12 @@ client.on('message', (message) => {
           && override === 0) {
           power = allSystems[i].power;
         }
+        controlledSystems += 1;
         break;
 			}
 		}
     // exit if system does not exist
-		if (sphereCoords.x === undefined) {
+		if (controlSphereSystem.x === undefined) {
       console.log('command aborted');
 			return message.channel.send('Something went wrong; was there a typo?');
 		}
@@ -471,7 +488,11 @@ client.on('message', (message) => {
         if (allSystems[i].power === power && allSystems[i].power_state === 'Control') {
           controlledSystems += 1;
         }
-        if (distLessThan(15, sphereCoords.x, sphereCoords.y, sphereCoords.z, allSystems[i].x, allSystems[i].y, allSystems[i].z) === true) {
+        if (distLessThan(15, controlSphereSystem.x, controlSphereSystem.y, controlSphereSystem.z, allSystems[i].x, allSystems[i].y, allSystems[i].z) === true) {
+          // filter out control system
+          if (sphere === allSystems[i].name) {
+            continue;
+          }
           const lastTick = lastUpdated(allSystems[i].minor_factions_updated_at * 1000); // convert from unix timestamp
 
           // displayed sphere data
@@ -503,18 +524,22 @@ client.on('message', (message) => {
           grossCC += popToCC(allSystems[i].population);
           // Control - Contested
           if (sphereType === 'Control' && allSystems[i].power_state === 'Contested') {
+            let tmpnum = 0;
+            const system2 = {};
             for (let j = 0; j < allSystems.length; j++) {
               if (distLessThan(15, allSystems[i].x, allSystems[i].y, allSystems[i].z, allSystems[j].x, allSystems[j].y, allSystems[j].z)
-                && allSystems[j].power_state === 'Control') {
-                const system2 = {};
+                && allSystems[j].power_state === 'Control' && allSystems[j].power != power) {
                 system2.power = allSystems[j].power;
-                system2.cc = popToCC(allSystems[j].population);
-                contestedSystems.push(system2);
+                system2.cc = popToCC(allSystems[i].population);
+                tmpnum += 1;
               }
+            }
+            if (tmpnum === 1) {
+              contestedSystems.push(system2);
             }
           }
           // Expansion - Contested
-          if (sphereType === 'Expansion' && (allSystems[i].power_state === 'Exploited' || allSystems[i].power_state === 'Expansion')) {
+          if (sphereType === 'Expansion' && allSystems[i].power_state !== 'Contested' && allSystems[i].power_state !== null) {
             const system2 = {};
             system2.power = allSystems[i].power;
             system2.cc = popToCC(allSystems[i].population);
@@ -536,46 +561,39 @@ client.on('message', (message) => {
       if (contestedSystems[i].power === 'Zachary Hudson') {
         onelineContestedSystems[0].power = contestedSystems[i].power;
         onelineContestedSystems[0].cc += contestedSystems[i].cc;
-      }
-      if (contestedSystems[i].power === 'Felicia Winters') {
+      } else if (contestedSystems[i].power === 'Felicia Winters') {
         onelineContestedSystems[1].power = contestedSystems[i].power;
         onelineContestedSystems[1].cc += contestedSystems[i].cc;
-      }
-      if (contestedSystems[i].power === 'Arissa Lavigny-Duval') {
+      } else if (contestedSystems[i].power === 'Arissa Lavigny-Duval') {
         onelineContestedSystems[2].power = contestedSystems[i].power;
         onelineContestedSystems[2].cc += contestedSystems[i].cc;
-      }
-      if (contestedSystems[i].power === 'Edmund Mahon') {
+      } else if (contestedSystems[i].power === 'Edmund Mahon') {
         onelineContestedSystems[3].power = contestedSystems[i].power;
         onelineContestedSystems[3].cc += contestedSystems[i].cc;
-      }
-      if (contestedSystems[i].power === 'Archon Delaine') {
+      } else if (contestedSystems[i].power === 'Archon Delaine') {
         onelineContestedSystems[4].power = contestedSystems[i].power;
         onelineContestedSystems[4].cc += contestedSystems[i].cc;
-      }
-      if (contestedSystems[i].power === 'Denton Patreus') {
+      } else if (contestedSystems[i].power === 'Denton Patreus') {
         onelineContestedSystems[5].power = contestedSystems[i].power;
         onelineContestedSystems[5].cc += contestedSystems[i].cc;
-      }
-      if (contestedSystems[i].power === 'Yuri Grom') {
+      } else if (contestedSystems[i].power === 'Yuri Grom') {
         onelineContestedSystems[6].power = contestedSystems[i].power;
         onelineContestedSystems[6].cc += contestedSystems[i].cc;
-      }
-      if (contestedSystems[i].power === 'Li Yong-Rui') {
+      } else if (contestedSystems[i].power === 'Li Yong-Rui') {
         onelineContestedSystems[7].power = contestedSystems[i].power;
         onelineContestedSystems[7].cc += contestedSystems[i].cc;
-      }
-      if (contestedSystems[i].power === 'Zemina Torval') {
+      } else if (contestedSystems[i].power === 'Zemina Torval') {
         onelineContestedSystems[8].power = contestedSystems[i].power;
         onelineContestedSystems[8].cc += contestedSystems[i].cc;
-      }
-      if (contestedSystems[i].power === 'Pranav Antal') {
+      } else if (contestedSystems[i].power === 'Pranav Antal') {
         onelineContestedSystems[9].power = contestedSystems[i].power;
         onelineContestedSystems[9].cc += contestedSystems[i].cc;
-      }
-      if (contestedSystems[i].power === 'Aisling Duval') {
+      } else if (contestedSystems[i].power === 'Aisling Duval') {
         onelineContestedSystems[10].power = contestedSystems[i].power;
         onelineContestedSystems[10].cc += contestedSystems[i].cc;
+      } else if (contestedSystems[i].power_state === 'Contested') {
+        onelineContestedSystems[11].power = 'multiple powers';
+        onelineContestedSystems[11].cc += contestedSystems[i].cc;
       }
     }
     let contestedStr = '';
@@ -586,7 +604,7 @@ client.on('message', (message) => {
     }
 
     // math for cc calculations
-    const HQDistance = HQDistances(power, sphereCoords.x, sphereCoords.y, sphereCoords.z);
+    const HQDistance = HQDistances(power, controlSphereSystem.x, controlSphereSystem.y, controlSphereSystem.z);
     // Upkeep
     const upkeep = Math.ceil((HQDistance ** 2) * 0.001 + 20);
     // Overhead
@@ -631,6 +649,12 @@ client.on('message', (message) => {
         targetSystems[i].state = '';
       }
     }
+
+    // add back in control system
+    delete controlSphereSystem.x;
+    delete controlSphereSystem.y;
+    delete controlSphereSystem.z;
+    targetSystems.push(controlSphereSystem);
 
 		// sorts
     // power -> power state -> government
@@ -1532,6 +1556,8 @@ client.on('message', (message) => {
 		const cc = '\t~cc <power> shows the total cc and systems controlled and exploited by a power. Good for confirming if database has been updated.\n';
 		const postamble = 'The dates shown reflect when the leads were last updated, and are *roughly* autocorrected to the last tick time (faulty since EDO). Data is pulled from EDDB daily at 1am CST\n';
 		message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${sphere}${multisphere}${scout}${faction}${profitables}${cc}\n ${postamble}\`\`\``);
-	}
+	} else if (command === 't') {
+    console.log(client.guilds.cache);
+  }
 });
 client.login(token);
