@@ -322,7 +322,7 @@ function mirrorEddb() {
 	// save file as data for day before
 	const pathOne = `./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`;
 	const pathTwo = './data/stations.json';
-	exec('mkdir data', (error) => { console.log(error);});
+	exec('mkdir data');
 	download(urlOne, pathOne, () => {
 		const now = new Date();
 		console.log(`EDDB populated systems json mirrored at ${now}`);
@@ -336,7 +336,7 @@ function mirrorEddb() {
 	oldData = new Date(oldData); // convert ms to Date object
 	const oldJSON = `./data/systems_populated_${oldData.getMonth() + 1}_${oldData.getDate()}_${oldData.getFullYear()}.json`;
 	fs.stat(oldJSON, (err) => { // check if old data exists
-		if (err) return console.log(err);
+		if (err) return;
 		fs.unlink(oldJSON, () => { // delete old data
 			console.log('file deleted successfully');
 		});
@@ -453,6 +453,8 @@ client.on('message', (message) => {
         controlSphereSystem.power = allSystems[i].power;
         controlSphereSystem.state = allSystems[i].power_state;
 
+        grossCC += popToCC(allSystems[i].population);
+
         if (allSystems[i].power_state === 'Control') {
           sphereType = 'Control';
         }
@@ -466,7 +468,6 @@ client.on('message', (message) => {
           && override === 0) {
           power = allSystems[i].power;
         }
-        controlledSystems += 1;
         break;
 			}
 		}
@@ -489,7 +490,8 @@ client.on('message', (message) => {
         && allSystems[i].name !== 'Sharur'
         && allSystems[i].name !== 'Tarnkappe'
         && allSystems[i].name !== 'Tyet'
-        && allSystems[i].name !== 'Wolfsegen') {
+        && allSystems[i].name !== 'Wolfsegen'
+        && allSystems[i].population > 0) {
         // count control systems of input power
         if (allSystems[i].power === power && allSystems[i].power_state === 'Control') {
           controlledSystems += 1;
@@ -527,7 +529,12 @@ client.on('message', (message) => {
           if (tmp === -1) { console.log('favorability error'); }
           favor = `${favorables}/${neutrals}/${unfavorables}`;
           // Gross CC
-          grossCC += popToCC(allSystems[i].population);
+          if (sphereType === 'Expansion' && allSystems[i].power_state === null) {
+            grossCC += popToCC(allSystems[i].population);
+          }
+          if (sphereType === 'Control' && allSystems[i].power_state === 'Exploited') {
+            grossCC += popToCC(allSystems[i].population);
+          }
           // Control - Contested
           if (sphereType === 'Control' && allSystems[i].power_state === 'Contested') {
             let tmpnum = 0;
@@ -609,30 +616,30 @@ client.on('message', (message) => {
       }
     }
 
-    // math for cc calculations
+    // add back in control system
     const HQDistance = HQDistances(power, controlSphereSystem.x, controlSphereSystem.y, controlSphereSystem.z);
+    delete controlSphereSystem.x;
+    delete controlSphereSystem.y;
+    delete controlSphereSystem.z;
+    targetSystems.push(controlSphereSystem);
+
+    // math for cc calculations
     // Upkeep
     const upkeep = Math.ceil((HQDistance ** 2) * 0.001 + 20);
     // Overhead
-    let overhead;
-    if (sphereType === 'Control') {
-      overhead = (Math.min(((11.5 * (controlledSystems)) / 42) ** 3, 5.4 * 11.5 * controlledSystems)) / controlledSystems;
-    }
+    // Control
+    console.log(controlledSystems)
+    const overhead = (Math.min(((11.5 * (controlledSystems)) / 42) ** 3, 5.4 * 11.5 * controlledSystems)) / controlledSystems;
+    const overheadMax = (Math.min(((11.5 * (99)) / 42) ** 3, 5.4 * 11.5 * 99)) / 99;
+    // Expansion
+    let overheadEdge = 0;
     if (sphereType === 'Expansion') {
-      // controlledSystems + 1 is due to the additional system added via the expansion itself
-      overhead = (Math.min(((11.5 * (controlledSystems + 1)) / 42) ** 3, 5.4 * 11.5 * (controlledSystems + 1))) / (controlledSystems + 1);
+      const overheadDiff = ((Math.min(((11.5 * (controlledSystems + 1)) / 42) ** 3, 5.4 * 11.5 * (controlledSystems + 1))) / (controlledSystems + 1)) - overhead;
+      overheadEdge = overheadDiff * (controlledSystems + 1);
     }
-    const overheadMax = (Math.min(((11.5 * (55)) / 42) ** 3, 5.4 * 11.5 * 55)) / 55;
     // Net CC
-    let contested = 0;
-    for (let i = 0; i < onelineContestedSystems.length; i++) {
-      // todo improve araay to not need to filter data every time its referenced
-      if (onelineContestedSystems[i].power !== undefined && onelineContestedSystems[i].power !== power) {
-        contested += onelineContestedSystems[i].cc;
-      }
-    }
-    const netCC = grossCC - overhead - upkeep - contested;
-    const netCCMax = grossCC - overheadMax - upkeep - contested;
+    const netCC = grossCC - overhead - upkeep;
+    const netCCMax = grossCC - overheadMax - upkeep;
 
     // math for fortification / undermining / expansion triggers
     let fort = -1;
@@ -655,12 +662,6 @@ client.on('message', (message) => {
         targetSystems[i].state = '';
       }
     }
-
-    // add back in control system
-    delete controlSphereSystem.x;
-    delete controlSphereSystem.y;
-    delete controlSphereSystem.z;
-    targetSystems.push(controlSphereSystem);
 
 		// sorts
     // power -> power state -> government
@@ -694,11 +695,6 @@ client.on('message', (message) => {
 			}
 		}
 
-		// add max overhead if power is not at max already
-		let maxOverheadStr = `/ ${netCCMax.toFixed(1)}CC at max overhead`;
-		if (controlledSystems >= 55) {
-			maxOverheadStr = '';
-		}
 
 		// warning addition
 		let warningStr = '';
@@ -710,34 +706,52 @@ client.on('message', (message) => {
 
     // output main block(s)
     let block = '';
-    const columns = columnify(targetSystems); // tabularize info
     let subSystems = [];
-    let x = 0;
-    for (let i = 0; i < targetSystems.length; i++) {
-      subSystems.push(targetSystems[i]);
-      if ((i + 1) % 24 === 0) {
-        block = columnify(subSystems);
-        subSystems = [];
-        message.channel.send(`\`\`\`asciidoc\n= ${sphere} ${sphereType} Sphere Analysis\t\t${oppOrFortInfo}\n${warningStr}\n${columns}\n\`\`\``);
-      }
-      x += 1;
-    }
-    if (x === 0) {
+    if (targetSystems.length === 0) {
       message.channel.send('`No systems found`');
-    } else if (x < 24) {
-      block = columnify(targetSystems);
+    } else if (targetSystems.length <= 20) {
+      const columns = columnify(targetSystems); // tabularize info
       message.channel.send(`\`\`\`asciidoc\n= ${sphere} ${sphereType} Sphere Analysis\t\t${oppOrFortInfo}\n${warningStr}\n${columns}\n\`\`\``);
     } else {
+      let i = 0;
+      // print with header and first 20 systems
+      for (; i < 20; i++) {
+        subSystems.push(targetSystems[i]);
+      }
       block = columnify(subSystems);
-      message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+      message.channel.send(`\`\`\`asciidoc\n= ${sphere} ${sphereType} Sphere Analysis\t\t${oppOrFortInfo}\n${warningStr}\n${block}\n\`\`\``);
+      // loop out rest of the systems in 25 system increments
+      subSystems = [];
+      for (; i < targetSystems.length; i++) {
+        subSystems.push(targetSystems[i]);
+        // every 25 after the first 20 systems
+        if (i > 25 && i % 25 === 0) {
+          block = columnify(subSystems);
+          message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+          subSystems = [];
+        }
+      }
+      // print remainder of systems
+      if (subSystems.length !== 0) {
+        block = columnify(subSystems);
+          message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+      }
     }
 
     // footer
+    // add max overhead if power is not at max already
+    let overheadStr = overhead.toFixed(1);
+    let overheadMaxStr = '';
+		if (overhead.toFixed(1) !== '62.1') {
+      overheadStr = `(${overhead.toFixed(1)} + ${overheadEdge.toFixed(1)})`;
+      overheadMaxStr = ` / ${netCCMax.toFixed(1)} at max overhead`;
+		}
     const favorStr = `${favor} favorable/neutral/unfavorable systems for ${power}`;
     const grossStr = `Sphere gross value: ${grossCC}CC`;
-    const upkeepOverheadStr = `Upkeep + Overhead: ${upkeep} + ${overhead.toFixed(1)}`;
-    const netStr = `Net CC gained: ${netCC.toFixed(1)}CC ${maxOverheadStr}`;
-		message.channel.send(`\`\`\`\n${favorStr}\n${grossStr}\n${contestedStr}${upkeepOverheadStr}\n${netStr}\n\`\`\``);
+    const upkeepOverheadStr = `Upkeep + Overhead: ${upkeep} + ${overheadStr}`;
+    const netStr = `Net CC gained: ${netCC.toFixed(1)}CC${overheadMaxStr}`;
+    const powerChange = `${power} total CC change: ${(netCC - overheadEdge).toFixed(1)}`;
+		message.channel.send(`\`\`\`\n${favorStr}\n${grossStr}\n${contestedStr}${upkeepOverheadStr}\n${netStr}\n${powerChange}\n\`\`\``);
 
     // mem usage
     const used = process.memoryUsage().heapUsed / 1024 / 1024;
@@ -846,17 +860,17 @@ client.on('message', (message) => {
 		console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
 	} else if (command === 'threats') {
 		if (message.author.id !== '182976741373902848' // Cynder
-    || message.author.id !== '187391406111850496' // Aero
-    || message.author.id !== '202852077993590785' // Oraki
-    || message.author.id !== '522888275283673092' // Gwar
-    || message.author.id !== '552524920643518465' // Momo
-    || message.author.id !== '209888324930764800' // :ocean:
-    || message.author.id !== '174069540563451905' // Andalyn
-    || message.author.id !== '100903405358190592' // DivadREX
-    || message.author.id !== '256475063975542784' // Bones
-    || message.author.id !== '173834440227684352' // Ikuo
-    || message.author.id !== '404662765299433472' // Schielman
-    || message.author.id !== '133358103201710080') { // Mantis
+    && message.author.id !== '187391406111850496' // Aero
+    && message.author.id !== '202852077993590785' // Oraki
+    && message.author.id !== '522888275283673092' // Gwar
+    && message.author.id !== '552524920643518465' // Momo
+    && message.author.id !== '209888324930764800' // :ocean:
+    && message.author.id !== '174069540563451905' // Andalyn
+    && message.author.id !== '100903405358190592' // DivadREX
+    && message.author.id !== '256475063975542784' // Bones
+    && message.author.id !== '173834440227684352' // Ikuo
+    && message.author.id !== '404662765299433472' // Schielman
+    && message.author.id !== '133358103201710080') { // Mantis
 			console.log('- - Unauthorized command \'threats\' attempted - -');
 			return message.channel.send('You do not have permission to use this command.');
 		}
@@ -1117,17 +1131,17 @@ client.on('message', (message) => {
 		console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
 	} else if (command === 'profitables') {
     if (message.author.id !== '182976741373902848' // Cynder
-    || message.author.id !== '187391406111850496' // Aero
-    || message.author.id !== '202852077993590785' // Oraki
-    || message.author.id !== '522888275283673092' // Gwar
-    || message.author.id !== '552524920643518465' // Momo
-    || message.author.id !== '209888324930764800' // :ocean:
-    || message.author.id !== '174069540563451905' // Andalyn
-    || message.author.id !== '100903405358190592' // DivadREX
-    || message.author.id !== '256475063975542784' // Bones
-    || message.author.id !== '173834440227684352' // Ikuo
-    || message.author.id !== '404662765299433472' // Schielman
-    || message.author.id !== '133358103201710080') { // Mantis
+    && message.author.id !== '187391406111850496' // Aero
+    && message.author.id !== '202852077993590785' // Oraki
+    && message.author.id !== '522888275283673092' // Gwar
+    && message.author.id !== '552524920643518465' // Momo
+    && message.author.id !== '209888324930764800' // :ocean:
+    && message.author.id !== '174069540563451905' // Andalyn
+    && message.author.id !== '100903405358190592' // DivadREX
+    && message.author.id !== '256475063975542784' // Bones
+    && message.author.id !== '173834440227684352' // Ikuo
+    && message.author.id !== '404662765299433472' // Schielman
+    && message.author.id !== '133358103201710080') { // Mantis
 			console.log('- - Unauthorized command \'threats\' attempted - -');
 			return message.channel.send('You do not have permission to use this command.');
 		}
@@ -1577,7 +1591,7 @@ client.on('message', (message) => {
 		}
 	} else if (command === 'help') {
 		// readability
-		const version = 'Current Version: 1.0.0';
+		const version = 'Current Version: 1.0.5';
 		const preamble = 'All data is as up-to-date as possible via eddb. Jibri can receive dms, and does not log data for any commands given.\n\n';
 		const sphere = '\t~sphere <-o (optional)> <power> <system> designates a system as a midpoint, and grabs data for all populated systems within a 15ly sphere. If the target system is a control system, instead automatically shows control data. Adding -o will make it so the input power name is used regardless of control state. Example: ~sphere Winters Mbambiva\n';
 		const multisphere = '\t~multisphere <system 1> <system 2> ... <system n> shows all systems overlapped by the 15ly spheres of the input systems.\n';
