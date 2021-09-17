@@ -5,6 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "async-limiter": "^1.0.1",
+    "bind": "^0.1.7",
     "columnify": "^1.5.4",
     "discord.js": "^12.5.1",
     "dotenv": "^8.2.0",
