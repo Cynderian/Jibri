@@ -327,17 +327,16 @@ exports.run = (client, message, args) => {
         warningStr = '[ Warning: Target system is currently being expanded from ]\n';
     }
 
-    /* Discord doesn't format correctly :c
     // Control system adjustments
     if (sphereType === 'Control') {
         if (favorables > neutrals && favorables > unfavorables) {
-            oppOrFortInfo = `= ${fort} to fortify =`;
+            oppOrFortInfo = `\n= ${fort} to fortify =`;
         } else if (unfavorables > neutrals && unfavorables > favorables) {
-            oppOrFortInfo = `[ ${fort} to fortify ]`;
+            oppOrFortInfo = `\n[ ${fort} to fortify ]`;
         } else {
-            oppOrFortInfo = `| ${fort} to fortify |`;
+            oppOrFortInfo = `\n| ${fort} to fortify |`;
         }
-    }*/
+    }
 
     // output main block(s)
     let block = '';
