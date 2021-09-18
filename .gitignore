@@ -1,4 +1,5 @@
 config.json
 node_modules
 .eslintrc.json
-data
+data/*
+!data/trello_list.txt

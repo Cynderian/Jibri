@@ -15,10 +15,18 @@ exports.run = (client, message, args) => {
         return message.channel.send('Please define a first reference power.');
     }
     // Override to ignore system control state
+    let anyOverride = 0;
     let overrideProfitables = 0;
+    let overrideTrello = 0;
     if (args[0] === '-profitables') {
         console.log('profitables override enabled');
         overrideProfitables = 1;
+        anyOverride = 1;
+        args.shift();
+    } else if (args[0] === '-trello') {
+        console.log('trello override enabled');
+        overrideTrello = 1;
+        anyOverride = 1;
         args.shift();
     }
     // power assignment
@@ -56,24 +64,26 @@ exports.run = (client, message, args) => {
             controlSystem.y = allSystems[i].y;
             controlSystem.z = allSystems[i].z;
 
-            if (overrideProfitables === 0) {
+            // pushes all control systems
+            if (anyOverride === 0) {
                 controlSystems.push(controlSystem);
-            } else {
+            // pushes profitable control systems and favorable factions
+            } else if (overrideProfitables === 1) {
                 let grossCC = 0;
                 for (let j = 0; j < allSystems.length; j++) {
                     if (allSystems[i].population > 0
-          && allSystems[i].name !== 'Shinrarta Dezhra' // you know where this is
-          && allSystems[i].name !== 'Azoth' // 10 starter systems
-          && allSystems[i].name !== 'Dromi'
-          && allSystems[i].name !== 'Lia Fall'
-          && allSystems[i].name !== 'Matet'
-          && allSystems[i].name !== 'Orna'
-          && allSystems[i].name !== 'Otegine'
-          && allSystems[i].name !== 'Sharur'
-          && allSystems[i].name !== 'Tarnkappe'
-          && allSystems[i].name !== 'Tyet'
-          && allSystems[i].name !== 'Wolfsegen'
-          && distLessThan(15, allSystems[j].x, allSystems[j].y, allSystems[j].z, controlSystem.x, controlSystem.y, controlSystem.z) === true) {
+                    && allSystems[i].name !== 'Shinrarta Dezhra' // you know where this is
+                    && allSystems[i].name !== 'Azoth' // 10 starter systems
+                    && allSystems[i].name !== 'Dromi'
+                    && allSystems[i].name !== 'Lia Fall'
+                    && allSystems[i].name !== 'Matet'
+                    && allSystems[i].name !== 'Orna'
+                    && allSystems[i].name !== 'Otegine'
+                    && allSystems[i].name !== 'Sharur'
+                    && allSystems[i].name !== 'Tarnkappe'
+                    && allSystems[i].name !== 'Tyet'
+                    && allSystems[i].name !== 'Wolfsegen'
+                    && distLessThan(15, allSystems[j].x, allSystems[j].y, allSystems[j].z, controlSystem.x, controlSystem.y, controlSystem.z) === true) {
                         grossCC += popToCC(allSystems[j].population);
                     }
                 }
@@ -83,6 +93,13 @@ exports.run = (client, message, args) => {
                 const netCC = grossCC - overhead - upkeep;
                 if (netCC > 0) {
                     controlSystems.push(controlSystem);
+                }
+            } else if (overrideTrello === 1) {
+                const trelloSystems = fs.readFileSync('./data/trello_list.txt').toString().split('\n');
+                for (let j = 0; j < trelloSystems.length; j++) {
+                    if (allSystems[i].name === trelloSystems[j]) {
+                        controlSystems.push(controlSystem);
+                    }
                 }
             }
         }
@@ -98,17 +115,17 @@ exports.run = (client, message, args) => {
     }
     for (let i = 0; i < allSystems.length; i++) {
         if (allSystems[i].population > 0
-      && allSystems[i].name !== 'Shinrarta Dezhra' // you know where this is
-      && allSystems[i].name !== 'Azoth' // 10 starter systems
-      && allSystems[i].name !== 'Dromi'
-      && allSystems[i].name !== 'Lia Fall'
-      && allSystems[i].name !== 'Matet'
-      && allSystems[i].name !== 'Orna'
-      && allSystems[i].name !== 'Otegine'
-      && allSystems[i].name !== 'Sharur'
-      && allSystems[i].name !== 'Tarnkappe'
-      && allSystems[i].name !== 'Tyet'
-      && allSystems[i].name !== 'Wolfsegen') {
+        && allSystems[i].name !== 'Shinrarta Dezhra' // you know where this is
+        && allSystems[i].name !== 'Azoth' // 10 starter systems
+        && allSystems[i].name !== 'Dromi'
+        && allSystems[i].name !== 'Lia Fall'
+        && allSystems[i].name !== 'Matet'
+        && allSystems[i].name !== 'Orna'
+        && allSystems[i].name !== 'Otegine'
+        && allSystems[i].name !== 'Sharur'
+        && allSystems[i].name !== 'Tarnkappe'
+        && allSystems[i].name !== 'Tyet'
+        && allSystems[i].name !== 'Wolfsegen') {
             for (let j = 0; j < controlSystems.length; j++) {
                 // all systems within 45ly of any control sphere (15ly radius internal, 30ly radius external)
                 if (distLessThan(range, allSystems[i].x, allSystems[i].y, allSystems[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z) === true) {
@@ -295,7 +312,7 @@ exports.run = (client, message, args) => {
     }
     if (x === 0) {
         message.channel.send('`No systems found`');
-    } else if (x < 24) {
+    } else if (x < 25) {
         const block = columnify(dangerSystems);
         message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
     } else {
