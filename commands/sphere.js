@@ -162,7 +162,7 @@ exports.run = (client, message, args) => {
                     const system2 = {};
                     for (let j = 0; j < allSystems.length; j++) {
                         if (distLessThan(15, allSystems[i].x, allSystems[i].y, allSystems[i].z, allSystems[j].x, allSystems[j].y, allSystems[j].z)
-            && allSystems[j].power_state === 'Control' && allSystems[j].power != power) {
+                        && allSystems[j].power_state === 'Control' && allSystems[j].power != power) {
                             system2.power = allSystems[j].power;
                             system2.cc = popToCC(allSystems[i].population);
                             tmp2 = popToCC(allSystems[i].population);
@@ -170,6 +170,11 @@ exports.run = (client, message, args) => {
                         }
                     }
                     if (tmpnum === 1) {
+                        contestedSystems.push(system2);
+                        contestedCC += tmp2;
+                    }
+                    if (tmpnum > 1) {
+                        system2.power = 'multiple powers';
                         contestedSystems.push(system2);
                         contestedCC += tmp2;
                     }
@@ -188,7 +193,7 @@ exports.run = (client, message, args) => {
     // Control - Contested systems string-ification
     // generate blank objects for indexes
     const onelineContestedSystems = [];
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < 12; i++) {
         const system = {};
         system.power = undefined;
         system.cc = 0;
@@ -228,8 +233,8 @@ exports.run = (client, message, args) => {
         } else if (contestedSystems[i].power === 'Aisling Duval') {
             onelineContestedSystems[10].power = contestedSystems[i].power;
             onelineContestedSystems[10].cc += contestedSystems[i].cc;
-        } else if (contestedSystems[i].power_state === 'Contested') {
-            onelineContestedSystems[11].power = 'multiple powers';
+        } else if (contestedSystems[i].power === 'multiple powers') {
+            onelineContestedSystems[11].power = contestedSystems[i].power;
             onelineContestedSystems[11].cc += contestedSystems[i].cc;
         }
     }
@@ -376,14 +381,17 @@ exports.run = (client, message, args) => {
     // add max overhead if power is not at max already
     let overheadStr = overhead.toFixed(1);
     let overheadMaxStr = '';
-    if (overhead.toFixed(1) !== '62.1') {
+    if (overhead.toFixed(1) !== '62.1' && sphereType === 'Expansion') {
         overheadStr = `(${overhead.toFixed(1)} + ${overheadEdge.toFixed(1)})`;
         overheadMaxStr = ` / ${netCCMax.toFixed(1)} at max overhead`;
     }
     const favorStr = `${favor} favorable/neutral/unfavorable systems for ${power}`;
     const grossStr = `Sphere gross value: ${grossCC + contestedCC}CC`;
     const upkeepOverheadStr = `Upkeep + Overhead: ${upkeep} + ${overheadStr}`;
-    const netStr = `Net CC gained: ${netCC.toFixed(1)}CC${overheadMaxStr}`;
-    const powerChange = `${power} total CC change: ${(netCC - overheadEdge).toFixed(1)}`;
+    const netStr = `Net CC: ${netCC.toFixed(1)}CC${overheadMaxStr}`;
+    let powerChange = '';
+    if (sphereType === 'Expansion') {
+        powerChange = `${power} total CC change: ${(netCC - overheadEdge).toFixed(1)}`;
+    }
     message.channel.send(`\`\`\`\n${favorStr}\n${grossStr}\n${contestedStr}${upkeepOverheadStr}\n${netStr}\n${powerChange}\n\`\`\``);
 };
