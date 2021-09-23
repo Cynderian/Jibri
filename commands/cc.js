@@ -30,7 +30,7 @@ exports.run = (client, message, args) => {
 
     for (let i = 0; i < allSystems.length; i++) {
         if (allSystems[i].power === input
-    && (allSystems[i].power_state === 'Exploited' || allSystems[i].power_state === 'Control')) {
+        && (allSystems[i].power_state === 'Exploited' || allSystems[i].power_state === 'Control')) {
             const system = {};
             system.name = allSystems[i].name;
             system.cc = popToCC(allSystems[i].population);
