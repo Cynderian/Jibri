@@ -1,8 +1,10 @@
-const { capitalize, HQDistances, removeQuotes, inputPowerFilter, distLessThan } = require('../functions');
+const { capitalize, HQDistances, removeQuotes, inputPowerFilter, distLessThan, favorability } = require('../functions');
 const fs = require('fs');
 const columnify = require('columnify');
 exports.run = (client, message, args) => {
     console.log('working on unflip');
+    message.channel.send("This is an experimental command; double check its output!")
+    message.channel.send("There are no automatic filters for net CC of these spheres, so that weapons may show up as targets. Please manually double check all planned targets")
     const today = new Date();
     if (!args.length) {
         return message.channel.send('Please define a power');
@@ -65,7 +67,7 @@ exports.run = (client, message, args) => {
                 if (shortestDistanceToStar === -1) { throw 'No stations found within control system'; }
             } catch (e) {
                 console.error(e);
-                message.channel.send('Error encountered, please contact Cynder#7567');
+                return message.channel.send('Error encountered, please contact Cynder#7567');
             }
             
             // check if sphere is favorable, neutral, or unfavorable
@@ -74,7 +76,7 @@ exports.run = (client, message, args) => {
             let unfavorables = 0;
             for (j = 0; j < allSystems.length; j++) {
                 if (distLessThan(15, allSystems[i].x, allSystems[i].y, allSystems[i].z, allSystems[j].x, allSystems[j].y, allSystems[j].z) === true
-                    && allStations[j].power_state === 'Exploited') {
+                    && allSystems[j].power_state === 'Exploited') {
                     try {
                         let tmp = favorability(inputPower, allSystems[j].government, allSystems[j].power_state, inputPower, 'Control');
                         if (tmp === 'favorable') {
@@ -89,7 +91,7 @@ exports.run = (client, message, args) => {
                         if (tmp === -1) { throw 'favorability error' }
                     } catch (e) {
                         console.error(e);
-                        message.channel.send('Error encountered, please contact Cynder#7567');
+                        return message.channel.send('Error encountered, please contact Cynder#7567');
                     }
                 }
             }
@@ -142,50 +144,43 @@ exports.run = (client, message, args) => {
             if (meritsAddedAgain !== 0) {
                 const extraSystem = {};
                 extraSystem.name = allSystems[i].name;
-                extraSystem.jumps_added = Math.ceil((fortMerits + meritsAddedAgain) / cargoMax) - Math.ceil(fortMerits / cargoMax);
+                const ladenTwo = Math.ceil(HQDistance / ladenRange);
+                const unladenTwo = Math.ceil(HQDistance / unladenRange);
+                const additionalTwo = Math.ceil((fortMerits + meritsAddedAgain) / cargoMax) - Math.ceil(fortMerits / cargoMax);
+                extraSystem.jumps_added = additionalTwo * (ladenTwo + unladenTwo)
+                extraSystem.sc_distance = shortestDistanceToStar;
                 extraSystem.if = "Unfavorable";
                 unflippableSystems.push(extraSystem);
             }
 
+            const tmp = controlSystem.if;
+            delete controlSystem.if;
             controlSystem.jumps_added = jumpsAdded;
+            controlSystem.sc_distance = shortestDistanceToStar;
+            controlSystem.if = tmp;
             unflippableSystems.push(controlSystem);
         }
     }
 
     // sorts
-    // jumps_added
+    // jumps_added -> sc_distance
     unflippableSystems.sort((a, b) => b.jumps_added - a.jumps_added);
 
     // output main block(s)
     let block = '';
     let subSystems = [];
-    if (unflippableSystems.length === 0) {
-        message.channel.send('`No systems found`');
-    } else if (unflippableSystems.length <= 20) {
-        const columns = columnify(unflippableSystems); // tabularize info
-    } else {
-        let i = 0;
-        // print with header and first 20 systems
-        for (; i < 20; i++) {
-            subSystems.push(unflippableSystems[i]);
-        }
-        block = columnify(subSystems);
-        // loop out rest of the systems in 25 system increments
-        subSystems = [];
-        for (; i < unflippableSystems.length; i++) {
-            subSystems.push(unflippableSystems[i]);
-            // every 25 after the first 20 systems
-            if (i > 25 && i % 25 === 0) {
-                block = columnify(subSystems);
-                message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
-                subSystems = [];
-            }
-        }
-        // print remainder of systems
-        if (subSystems.length !== 0) {
+    for (i = 0; i < unflippableSystems.length; i++) {
+        subSystems.push(unflippableSystems[i]);
+        if (i > 0 && i % 30 === 0) {
             block = columnify(subSystems);
             message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
+            subSystems = [];
         }
+    }
+    // print remainder of systems
+    if (subSystems.length !== 0) {
+        block = columnify(subSystems);
+        message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
     }
     
 };
