@@ -7,6 +7,7 @@
     "async-limiter": "^1.0.1",
     "bind": "^0.1.7",
     "columnify": "^1.5.4",
+    "discord": "^0.8.2",
     "discord.js": "^12.5.1",
     "dotenv": "^8.2.0",
     "long": "^4.0.0",
