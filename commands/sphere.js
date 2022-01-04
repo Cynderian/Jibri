@@ -279,7 +279,7 @@ exports.run = (client, message, args) => {
         fort = Math.round(0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5); // neutral fort trigger
     }
     const umOpp = Math.round(2750000 / (HQDistance ** 1.5) + 5000); // opposition trigger
-    let oppOrFortNumber = (fort / umOpp).toFixed(2)
+    let oppOrFortNumber = (fort / umOpp).toFixed(2);
 
     // Shenanigans to get the sorts to work correctly when null values exist
     for (let i = 0; i < targetSystems.length; i++) {
@@ -348,11 +348,9 @@ exports.run = (client, message, args) => {
         if (favorables > neutrals && favorables > unfavorables) {
             infoStart = '= '
             infoEnd = ' (favorable) ='
-            oppOrFortNumber = oppOrFortNumber / 2;
         } else if (unfavorables > neutrals && unfavorables > favorables) {
             infoStart = '['
             infoEnd = ']'
-            oppOrFortNumber = oppOrFortNumber * 2;
         } else {
             infoStart = '| '
             infoEnd = ' |'
