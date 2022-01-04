@@ -279,7 +279,7 @@ exports.run = (client, message, args) => {
         fort = Math.round(0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5); // neutral fort trigger
     }
     const umOpp = Math.round(2750000 / (HQDistance ** 1.5) + 5000); // opposition trigger
-    let oppOrFortInfo = `${(fort / umOpp).toFixed(2)}:1 triggers`;
+    let oppOrFortNumber = (fort / umOpp).toFixed(2)
 
     // Shenanigans to get the sorts to work correctly when null values exist
     for (let i = 0; i < targetSystems.length; i++) {
@@ -335,22 +335,43 @@ exports.run = (client, message, args) => {
     // Control system adjustments
     if (sphereType === 'Control') {
         if (favorables > neutrals && favorables > unfavorables) {
-            oppOrFortInfo = `\n= ${fort} to fortify =`;
+            oppOrFortInfo = `= ${fort} to fortify =`;
         } else if (unfavorables > neutrals && unfavorables > favorables) {
-            oppOrFortInfo = `\n[ ${fort} to fortify ]`;
+            oppOrFortInfo = `[${fort} to fortify]`;
         } else {
-            oppOrFortInfo = `\n| ${fort} to fortify |`;
+            oppOrFortInfo = `| ${fort} to fortify |`;
         }
+    }
+    let infoStart = '';
+    let infoEnd = '';
+    if (sphereType === 'Expansion') {
+        if (favorables > neutrals && favorables > unfavorables) {
+            infoStart = '= '
+            infoEnd = ' (favorable) ='
+            oppOrFortNumber = oppOrFortNumber / 2;
+        } else if (unfavorables > neutrals && unfavorables > favorables) {
+            infoStart = '['
+            infoEnd = ']'
+            oppOrFortNumber = oppOrFortNumber * 2;
+        } else {
+            infoStart = '| '
+            infoEnd = ' |'
+        }
+        oppOrFortInfo = `${oppOrFortNumber}:1 triggers`;
     }
 
     // output main block(s)
     let block = '';
     let subSystems = [];
+    // info start/end (favorability)
+
+    // header
+    const header = `= ${sphere} ${sphereType} Sphere Analysis =\n${infoStart}${oppOrFortInfo}${infoEnd}\n${warningStr}\n`;
     if (targetSystems.length === 0) {
         message.channel.send('`No systems found`');
     } else if (targetSystems.length <= 20) {
         const columns = columnify(targetSystems); // tabularize info
-        message.channel.send(`\`\`\`asciidoc\n= ${sphere} ${sphereType} Sphere Analysis =\t\t${oppOrFortInfo}\n${warningStr}\n${columns}\n\`\`\``);
+        message.channel.send(`\`\`\`asciidoc\n${header}${columns}\`\`\``);
     } else {
         let i = 0;
         // print with header and first 20 systems
@@ -358,7 +379,7 @@ exports.run = (client, message, args) => {
             subSystems.push(targetSystems[i]);
         }
         block = columnify(subSystems);
-        message.channel.send(`\`\`\`asciidoc\n= ${sphere} ${sphereType} Sphere Analysis =\t\t${oppOrFortInfo}\n${warningStr}\n${block}\n\`\`\``);
+        message.channel.send(`\`\`\`asciidoc\n${header}${block}\`\`\``);
         // loop out rest of the systems in 25 system increments
         subSystems = [];
         for (; i < targetSystems.length; i++) {
