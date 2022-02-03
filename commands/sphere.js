@@ -15,6 +15,13 @@ exports.run = (client, message, args) => {
         override = 1;
         args.shift();
     }
+    let contests = 0;
+    if (args[0] === '-contests') {
+        console.log('detailed contests enabled');
+        message.channel.send('Detailed contests display enabled');
+        contests = 1;
+        args.shift();
+    }
     // power assignment
     let noInputPowerFlag = 0;
     let power = args[0]; // start at first argument to avoid an extra ' ' from for loop
@@ -42,6 +49,7 @@ exports.run = (client, message, args) => {
     // variable declarations
     const targetSystems = [];
     const contestedSystems = [];
+    const detailedContestedSystems = [];
     let grossCC = 0;
     let contestedCC = 0;
     let controlledSystems = 0;
@@ -85,8 +93,12 @@ exports.run = (client, message, args) => {
                 warningFlag = 'Exploited';
             }
             if ((allSystems[i].power_state === 'Control' || allSystems[i].power_state === 'Expansion')
-      && override === 0) {
+            && override === 0) {
                 power = allSystems[i].power;
+            }
+            if (override === 1) {
+                sphereType = 'Expansion'
+                controlSphereSystem.power_state = null;
             }
             break;
         }
@@ -101,17 +113,17 @@ exports.run = (client, message, args) => {
     }
     for (let i = 0; i < allSystems.length; i++) {
         if (allSystems[i].name !== 'Shinrarta Dezhra' // you know where this is
-    && allSystems[i].name !== 'Azoth' // 10 starter systems
-    && allSystems[i].name !== 'Dromi'
-    && allSystems[i].name !== 'Lia Fall'
-    && allSystems[i].name !== 'Matet'
-    && allSystems[i].name !== 'Orna'
-    && allSystems[i].name !== 'Otegine'
-    && allSystems[i].name !== 'Sharur'
-    && allSystems[i].name !== 'Tarnkappe'
-    && allSystems[i].name !== 'Tyet'
-    && allSystems[i].name !== 'Wolfsegen'
-    && allSystems[i].population > 0) {
+        && allSystems[i].name !== 'Azoth' // 10 starter systems
+        && allSystems[i].name !== 'Dromi'
+        && allSystems[i].name !== 'Lia Fall'
+        && allSystems[i].name !== 'Matet'
+        && allSystems[i].name !== 'Orna'
+        && allSystems[i].name !== 'Otegine'
+        && allSystems[i].name !== 'Sharur'
+        && allSystems[i].name !== 'Tarnkappe'
+        && allSystems[i].name !== 'Tyet'
+        && allSystems[i].name !== 'Wolfsegen'
+        && allSystems[i].population > 0) {
             // count control systems of input power
             if (allSystems[i].power === power && allSystems[i].power_state === 'Control') {
                 controlledSystems += 1;
@@ -134,6 +146,34 @@ exports.run = (client, message, args) => {
                 system.state = allSystems[i].power_state;
                 targetSystems.push(system);
 
+                // contests - extra data
+                if (contests === 1) {
+                    for (let j = 0; j < allSystems.length; j++) {
+                        if (allSystems[j].name !== 'Shinrarta Dezhra' // you know where this is
+                        && allSystems[j].name !== 'Azoth' // 10 starter systems
+                        && allSystems[j].name !== 'Dromi'
+                        && allSystems[j].name !== 'Lia Fall'
+                        && allSystems[j].name !== 'Matet'
+                        && allSystems[j].name !== 'Orna'
+                        && allSystems[j].name !== 'Otegine'
+                        && allSystems[j].name !== 'Sharur'
+                        && allSystems[j].name !== 'Tarnkappe'
+                        && allSystems[j].name !== 'Tyet'
+                        && allSystems[j].name !== 'Wolfsegen'
+                        && allSystems[j].population > 0
+                        && distLessThan(15, allSystems[i].x, allSystems[i].y, allSystems[i].z, allSystems[j].x, allSystems[j].y, allSystems[j].z) === true
+                        && allSystems[j].power_state === 'Control'
+                        && allSystems[j].name !== controlSphereSystem.name) {
+                            // contested control systems
+                            const contestedSystem = {};
+                            contestedSystem.name = allSystems[i].name;
+                            contestedSystem.control_name = allSystems[j].name;
+                            contestedSystem.power = allSystems[j].power;
+                            contestedSystem.cc = popToCC(allSystems[i].population);
+                            detailedContestedSystems.push(contestedSystem);
+                        }
+                    }
+                }
                 // footer data
                 // Favorable / Neutral / Unfavorable
                 const tmp = favorability(power, allSystems[i].government, allSystems[i].power_state, allSystems[i].power, sphereType);
@@ -192,56 +232,161 @@ exports.run = (client, message, args) => {
     }
     // Control - Contested systems string-ification
     // generate blank objects for indexes
+    let contestedStr = '';
     const onelineContestedSystems = [];
-    for (let i = 0; i < 12; i++) {
-        const system = {};
-        system.power = undefined;
-        system.cc = 0;
-        onelineContestedSystems.push(system);
-    }
-    for (let i = 0; i < contestedSystems.length; i++) {
-        if (contestedSystems[i].power === 'Zachary Hudson') {
-            onelineContestedSystems[0].power = contestedSystems[i].power;
-            onelineContestedSystems[0].cc += contestedSystems[i].cc;
-        } else if (contestedSystems[i].power === 'Felicia Winters') {
-            onelineContestedSystems[1].power = contestedSystems[i].power;
-            onelineContestedSystems[1].cc += contestedSystems[i].cc;
-        } else if (contestedSystems[i].power === 'Arissa Lavigny-Duval') {
-            onelineContestedSystems[2].power = contestedSystems[i].power;
-            onelineContestedSystems[2].cc += contestedSystems[i].cc;
-        } else if (contestedSystems[i].power === 'Edmund Mahon') {
-            onelineContestedSystems[3].power = contestedSystems[i].power;
-            onelineContestedSystems[3].cc += contestedSystems[i].cc;
-        } else if (contestedSystems[i].power === 'Archon Delaine') {
-            onelineContestedSystems[4].power = contestedSystems[i].power;
-            onelineContestedSystems[4].cc += contestedSystems[i].cc;
-        } else if (contestedSystems[i].power === 'Denton Patreus') {
-            onelineContestedSystems[5].power = contestedSystems[i].power;
-            onelineContestedSystems[5].cc += contestedSystems[i].cc;
-        } else if (contestedSystems[i].power === 'Yuri Grom') {
-            onelineContestedSystems[6].power = contestedSystems[i].power;
-            onelineContestedSystems[6].cc += contestedSystems[i].cc;
-        } else if (contestedSystems[i].power === 'Li Yong-Rui') {
-            onelineContestedSystems[7].power = contestedSystems[i].power;
-            onelineContestedSystems[7].cc += contestedSystems[i].cc;
-        } else if (contestedSystems[i].power === 'Zemina Torval') {
-            onelineContestedSystems[8].power = contestedSystems[i].power;
-            onelineContestedSystems[8].cc += contestedSystems[i].cc;
-        } else if (contestedSystems[i].power === 'Pranav Antal') {
-            onelineContestedSystems[9].power = contestedSystems[i].power;
-            onelineContestedSystems[9].cc += contestedSystems[i].cc;
-        } else if (contestedSystems[i].power === 'Aisling Duval') {
-            onelineContestedSystems[10].power = contestedSystems[i].power;
-            onelineContestedSystems[10].cc += contestedSystems[i].cc;
-        } else if (contestedSystems[i].power === 'multiple powers') {
-            onelineContestedSystems[11].power = contestedSystems[i].power;
-            onelineContestedSystems[11].cc += contestedSystems[i].cc;
+    if (contests === 1) {
+        // the total contested cc is...
+        // total self contested cc
+        // cc contested for n power is.. (contested control system 1, system 2..)
+        // cc contested for n+1 is...
+        let otherContestedCC = 0;
+        let selfContestedCC = 0;
+
+        // sorts
+        // system -> power -> control name
+        detailedContestedSystems.sort((a, b) => {
+            const nameA = a.control_name;
+            const nameB = b.control_name;
+            if (nameA < nameB) { return -1; }
+            if (nameA > nameB) { return 1; }
+            return 0;
+        });
+        detailedContestedSystems.sort((a, b) => {
+            const nameA = a.power;
+            const nameB = b.power;
+            if (nameA < nameB) { return -1; }
+            if (nameA > nameB) { return 1; }
+            return 0;
+        });
+        detailedContestedSystems.sort((a, b) => {
+            const nameA = a.name;
+            const nameB = b.name;
+            if (nameA < nameB) { return -1; }
+            if (nameA > nameB) { return 1; }
+            return 0;
+        });
+
+        // filter/trim list
+        for (let i = 1; i < detailedContestedSystems.length; i++) {
+            if (detailedContestedSystems[i].name === detailedContestedSystems[i-1].name) {
+
+            }
+        }
+
+        // total contested CC counts
+        for (let i = 0; i < detailedContestedSystems.length; i++) {
+            if (detailedContestedSystems[i].power !== controlSphereSystem.power) {
+                otherContestedCC += detailedContestedSystems[i].cc;
+            }
+        }
+        for (let i = 0; i < detailedContestedSystems.length; i++) {
+            if (detailedContestedSystems[i].power === controlSphereSystem.power) {
+                selfContestedCC += detailedContestedSystems[i].cc;
+            }
+        }
+        console.log(detailedContestedSystems);
+        contestedStr = `Contested CC with other powers: ${otherContestedCC}CC\nSelf-contested CC: ${selfContestedCC}CC\n`
+        for (let i = 0; i < 12; i++) {
+            const system = {};
+            system.power = undefined;
+            system.cc = 0;
+            onelineContestedSystems.push(system);
+        }
+        for (let i = 0; i < detailedContestedSystems.length; i++) {
+            if (detailedContestedSystems[i].power === 'Zachary Hudson') {
+                onelineContestedSystems[0].power = detailedContestedSystems[i].power;
+                onelineContestedSystems[0].cc += detailedContestedSystems[i].cc;
+            } else if (detailedContestedSystems[i].power === 'Felicia Winters') {
+                onelineContestedSystems[1].power = detailedContestedSystems[i].power;
+                onelineContestedSystems[1].cc += detailedContestedSystems[i].cc;
+            } else if (detailedContestedSystems[i].power === 'Arissa Lavigny-Duval') {
+                onelineContestedSystems[2].power = detailedContestedSystems[i].power;
+                onelineContestedSystems[2].cc += detailedContestedSystems[i].cc;
+            } else if (detailedContestedSystems[i].power === 'Edmund Mahon') {
+                onelineContestedSystems[3].power = detailedContestedSystems[i].power;
+                onelineContestedSystems[3].cc += detailedContestedSystems[i].cc;
+            } else if (detailedContestedSystems[i].power === 'Archon Delaine') {
+                onelineContestedSystems[4].power = detailedContestedSystems[i].power;
+                onelineContestedSystems[4].cc += detailedContestedSystems[i].cc;
+            } else if (detailedContestedSystems[i].power === 'Denton Patreus') {
+                onelineContestedSystems[5].power = detailedContestedSystems[i].power;
+                onelineContestedSystems[5].cc += detailedContestedSystems[i].cc;
+            } else if (detailedContestedSystems[i].power === 'Yuri Grom') {
+                onelineContestedSystems[6].power = detailedContestedSystems[i].power;
+                onelineContestedSystems[6].cc += detailedContestedSystems[i].cc;
+            } else if (detailedContestedSystems[i].power === 'Li Yong-Rui') {
+                onelineContestedSystems[7].power = detailedContestedSystems[i].power;
+                onelineContestedSystems[7].cc += detailedContestedSystems[i].cc;
+            } else if (detailedContestedSystems[i].power === 'Zemina Torval') {
+                onelineContestedSystems[8].power = detailedContestedSystems[i].power;
+                onelineContestedSystems[8].cc += detailedContestedSystems[i].cc;
+            } else if (detailedContestedSystems[i].power === 'Pranav Antal') {
+                onelineContestedSystems[9].power = detailedContestedSystems[i].power;
+                onelineContestedSystems[9].cc += detailedContestedSystems[i].cc;
+            } else if (detailedContestedSystems[i].power === 'Aisling Duval') {
+                onelineContestedSystems[10].power = detailedContestedSystems[i].power;
+                onelineContestedSystems[10].cc += detailedContestedSystems[i].cc;
+            } else {
+                console.log('error')
+                console.log(detailedContestedSystems[i])
+            }
+        }
+        for (let i = 0; i < onelineContestedSystems.length; i++) {
+            if (onelineContestedSystems[i].power !== undefined) {
+                contestedStr += `Contested with ${(onelineContestedSystems[i].power).split(' ')[0]}: ${onelineContestedSystems[i].cc}CC\n`;
+            }
         }
     }
-    let contestedStr = '';
-    for (let i = 0; i < onelineContestedSystems.length; i++) {
-        if (onelineContestedSystems[i].power !== undefined && onelineContestedSystems[i].power !== power) {
-            contestedStr += `Contested with ${(onelineContestedSystems[i].power).split(' ')[0]}: ${onelineContestedSystems[i].cc}CC\n`;
+    else {
+        for (let i = 0; i < 12; i++) {
+            const system = {};
+            system.power = undefined;
+            system.cc = 0;
+            onelineContestedSystems.push(system);
+        }
+        for (let i = 0; i < contestedSystems.length; i++) {
+            if (contestedSystems[i].power === 'Zachary Hudson') {
+                onelineContestedSystems[0].power = contestedSystems[i].power;
+                onelineContestedSystems[0].cc += contestedSystems[i].cc;
+            } else if (contestedSystems[i].power === 'Felicia Winters') {
+                onelineContestedSystems[1].power = contestedSystems[i].power;
+                onelineContestedSystems[1].cc += contestedSystems[i].cc;
+            } else if (contestedSystems[i].power === 'Arissa Lavigny-Duval') {
+                onelineContestedSystems[2].power = contestedSystems[i].power;
+                onelineContestedSystems[2].cc += contestedSystems[i].cc;
+            } else if (contestedSystems[i].power === 'Edmund Mahon') {
+                onelineContestedSystems[3].power = contestedSystems[i].power;
+                onelineContestedSystems[3].cc += contestedSystems[i].cc;
+            } else if (contestedSystems[i].power === 'Archon Delaine') {
+                onelineContestedSystems[4].power = contestedSystems[i].power;
+                onelineContestedSystems[4].cc += contestedSystems[i].cc;
+            } else if (contestedSystems[i].power === 'Denton Patreus') {
+                onelineContestedSystems[5].power = contestedSystems[i].power;
+                onelineContestedSystems[5].cc += contestedSystems[i].cc;
+            } else if (contestedSystems[i].power === 'Yuri Grom') {
+                onelineContestedSystems[6].power = contestedSystems[i].power;
+                onelineContestedSystems[6].cc += contestedSystems[i].cc;
+            } else if (contestedSystems[i].power === 'Li Yong-Rui') {
+                onelineContestedSystems[7].power = contestedSystems[i].power;
+                onelineContestedSystems[7].cc += contestedSystems[i].cc;
+            } else if (contestedSystems[i].power === 'Zemina Torval') {
+                onelineContestedSystems[8].power = contestedSystems[i].power;
+                onelineContestedSystems[8].cc += contestedSystems[i].cc;
+            } else if (contestedSystems[i].power === 'Pranav Antal') {
+                onelineContestedSystems[9].power = contestedSystems[i].power;
+                onelineContestedSystems[9].cc += contestedSystems[i].cc;
+            } else if (contestedSystems[i].power === 'Aisling Duval') {
+                onelineContestedSystems[10].power = contestedSystems[i].power;
+                onelineContestedSystems[10].cc += contestedSystems[i].cc;
+            } else if (contestedSystems[i].power === 'multiple powers') {
+                onelineContestedSystems[11].power = contestedSystems[i].power;
+                onelineContestedSystems[11].cc += contestedSystems[i].cc;
+            }
+        }
+        for (let i = 0; i < onelineContestedSystems.length; i++) {
+            if (onelineContestedSystems[i].power !== undefined && onelineContestedSystems[i].power !== power) {
+                contestedStr += `Contested with ${(onelineContestedSystems[i].power).split(' ')[0]}: ${onelineContestedSystems[i].cc}CC\n`;
+            }
         }
     }
 
@@ -289,6 +434,10 @@ exports.run = (client, message, args) => {
         if (targetSystems[i].state === null) {
             targetSystems[i].state = '';
         }
+        // contests modifier
+        if (contests === 1) {
+            targetSystems[i].contests = "";
+        }
     }
 
     // sorts
@@ -323,6 +472,35 @@ exports.run = (client, message, args) => {
         }
     }
 
+    // contests display adjustments
+    if (contests === 1) {
+        for (let i = 0; i < targetSystems.length; i++) {
+            delete targetSystems[i].government;
+            delete targetSystems[i].lead;
+            delete targetSystems[i].date;
+            for (let j = 0; j < detailedContestedSystems.length; j++) {
+                if (detailedContestedSystems[j].name === targetSystems[i].name) {
+                    // other contest
+                    if (!(targetSystems[i].power).includes(detailedContestedSystems[j].power)) {
+                        if (targetSystems[i].power == "") {
+                            targetSystems[i].power = controlSphereSystem.power;
+                        }
+                        targetSystems[i].power += `, ${detailedContestedSystems[j].power}`;
+                    // self-contest
+                    } else if ((targetSystems[i].power).includes(controlSphereSystem.power) && !(targetSystems[i].power).includes("(self-contested)")) {
+                        targetSystems[i].power += ` (self-contested)`;
+                    }
+                    // contested spheres
+                    if (targetSystems[i].contests === "") {
+                        targetSystems[i].contests = detailedContestedSystems[j].control_name;
+                    } else {
+                        targetSystems[i].contests += `, ${detailedContestedSystems[j].control_name}`;
+                    }
+                    
+                }
+            }
+        }
+    }
 
     // warning addition
     let warningStr = '';
@@ -365,6 +543,7 @@ exports.run = (client, message, args) => {
 
     // header
     const header = `= ${sphere} ${sphereType} Sphere Analysis =\n${infoStart}${oppOrFortInfo}${infoEnd}\n${warningStr}\n`;
+    // body
     if (targetSystems.length === 0) {
         message.channel.send('`No systems found`');
     } else if (targetSystems.length <= 20) {
@@ -372,8 +551,14 @@ exports.run = (client, message, args) => {
         message.channel.send(`\`\`\`asciidoc\n${header}${columns}\`\`\``);
     } else {
         let i = 0;
+        let firstDisp = 20;
+        let secDisp = 25;
+        if (contests === 1) {
+            firstDisp = 10;
+            secDisp = 10;
+        }
         // print with header and first 20 systems
-        for (; i < 20; i++) {
+        for (; i < firstDisp; i++) {
             subSystems.push(targetSystems[i]);
         }
         block = columnify(subSystems);
@@ -383,7 +568,7 @@ exports.run = (client, message, args) => {
         for (; i < targetSystems.length; i++) {
             subSystems.push(targetSystems[i]);
             // every 25 after the first 20 systems
-            if (i > 25 && i % 25 === 0) {
+            if (i > secDisp && i % secDisp === 0) {
                 block = columnify(subSystems);
                 message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
                 subSystems = [];
