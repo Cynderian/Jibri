@@ -1,9 +1,27 @@
 const { capitalize, HQDistances, removeQuotes, inputPowerFilter, distLessThan, favorability } = require('../functions');
 const fs = require('fs');
 const columnify = require('columnify');
+
+function minMovesNeutralPlurality(flips, favorables, neutrals, unfavorables) {
+    if (favorables > neutrals) {
+        neutrals += 1;
+        favorables -= 1;
+    } else {
+        neutrals += 1;
+        unfavorables -= 1;
+    }
+    flips += 1;
+    if (neutrals >= favorables && neutrals >= unfavorables) {
+        return flips;
+    } else {
+        return minMovesNeutralPlurality(flips, favorables, neutrals, unfavorables);
+    }
+}
+
 exports.run = (client, message, args) => {
     console.log('working on unflip');
     message.channel.send("This is an experimental command; double check its output!")
+    message.channel.send("This command does not account of Odyssey landables with a Power Contact")
     message.channel.send("There are no automatic filters for net CC of these spheres, so that weapons may show up as targets. Please manually double check all planned targets")
     const today = new Date();
     if (!args.length) {
@@ -47,7 +65,7 @@ exports.run = (client, message, args) => {
             try {
                 for (j = 0; j < allStations.length; j++) {
                     if (allSystems[i].id === allStations[j].system_id) {
-                        if (allStations[j].max_landing_pad_size === 'L') {
+                        if (allStations[j].max_landing_pad_size === 'L' && (shortestDistanceToStar > allStations[j].distance_to_star || shortestDistanceToStar === -1)) {
                             // if L pad is Odyssey only (only type 13), make a addendum
                             if (allStations[j].body_id === null && allStations[j].type_id === 13) {
                                 maxLandingPadSize = 'L';
@@ -56,6 +74,7 @@ exports.run = (client, message, args) => {
                             } else {
                                 maxLandingPadSize = 'L';
                                 shortestDistanceToStar = allStations[j].distance_to_star;
+                                odysseyOnly = 0;
                             }
                         }
                         // update clostest M pad if no L pad is yet found
@@ -95,6 +114,7 @@ exports.run = (client, message, args) => {
                     }
                 }
             }
+
             // if unfavorable, ignore
             if (unfavorables > neutrals && unfavorables > favorables) {
                 continue;
@@ -103,18 +123,23 @@ exports.run = (client, message, args) => {
             const fortMerits = Math.round(1 * (0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5));
             let meritsAdded = 0;
             let meritsAddedAgain = 0;
+            systemsAwayFromUnflip = 0;
             controlSystem.if = '';
+            controlSystem.minimum_flips = '';
             // if favorable, find value for flipping to both neutral or unfavorable (2 entries)
             if (favorables > neutrals && favorables > unfavorables) {
                 meritsAdded = Math.round(.5 * fortMerits); // favorable to neutral
                 meritsAddedAgain = fortMerits // favorable to unfavorable
                 controlSystem.if = 'Neutral';
+                controlSystem.minimum_flips = minMovesNeutralPlurality(0, favorables, neutrals, unfavorables);
             }
             // if neutral, find value for flipping unfavorable
             if (neutrals >= favorables && neutrals >= unfavorables) {
                 meritsAdded = Math.round(.5 * fortMerits); // neutral to unfavorable
                 controlSystem.if = 'Unfavorable';
             }
+
+
 
             // calculate trips required and ly per one-way trip
             // counting final return trip
@@ -149,6 +174,7 @@ exports.run = (client, message, args) => {
                 const additionalTwo = Math.ceil((fortMerits + meritsAddedAgain) / cargoMax) - Math.ceil(fortMerits / cargoMax);
                 extraSystem.jumps_added = additionalTwo * (ladenTwo + unladenTwo)
                 extraSystem.sc_distance = shortestDistanceToStar;
+                extraSystem.pad = maxLandingPadSize;
                 extraSystem.if = "Unfavorable";
                 unflippableSystems.push(extraSystem);
             }
@@ -157,6 +183,7 @@ exports.run = (client, message, args) => {
             delete controlSystem.if;
             controlSystem.jumps_added = jumpsAdded;
             controlSystem.sc_distance = shortestDistanceToStar;
+            controlSystem.pad = maxLandingPadSize;
             controlSystem.if = tmp;
             unflippableSystems.push(controlSystem);
         }
@@ -164,14 +191,15 @@ exports.run = (client, message, args) => {
 
     // sorts
     // jumps_added -> sc_distance
+    unflippableSystems.sort((a, b) => b.sc_distance - a.sc_distance);
     unflippableSystems.sort((a, b) => b.jumps_added - a.jumps_added);
-
+    
     // output main block(s)
     let block = '';
     let subSystems = [];
     for (i = 0; i < unflippableSystems.length; i++) {
         subSystems.push(unflippableSystems[i]);
-        if (i > 0 && i % 30 === 0) {
+        if (i > 0 && i % 20 === 0) {
             block = columnify(subSystems);
             message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
             subSystems = [];
