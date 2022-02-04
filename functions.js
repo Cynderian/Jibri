@@ -18,7 +18,7 @@ function inputPowerFilter(message, input) {
     if (casedInput === 'edmund' || casedInput === 'mahon') {
         return 'Edmund Mahon';
     }
-    if (casedInput === 'archon' || casedInput === 'delaine') {
+    if (casedInput === 'archon' || casedInput === 'delaine' || casedInput === 'kumo') {
         return 'Archon Delaine';
     }
     if (casedInput === 'denton' || casedInput === 'patreus') {
@@ -30,7 +30,7 @@ function inputPowerFilter(message, input) {
     if (casedInput === 'li' || casedInput === 'yong-rui' || casedInput === 'lyr') {
         return 'Li Yong-Rui';
     }
-    if (casedInput === 'zemina' || casedInput === 'torval') {
+    if (casedInput === 'zemina' || casedInput === 'torval' || casedInput === 'granny') {
         return 'Zemina Torval';
     }
     if (casedInput === 'pranav' || casedInput === 'antal') {
