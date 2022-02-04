@@ -478,27 +478,47 @@ exports.run = (client, message, args) => {
             delete targetSystems[i].government;
             delete targetSystems[i].lead;
             delete targetSystems[i].date;
+            let contestPowerStrFirst = '';
+            let contestPowerStrSecond = '';
+            let otherContestCounter = 0;
+            let selfContestCounter = 0;
             for (let j = 0; j < detailedContestedSystems.length; j++) {
                 if (detailedContestedSystems[j].name === targetSystems[i].name) {
                     // other contest
-                    if (!(targetSystems[i].power).includes(detailedContestedSystems[j].power)) {
-                        if (targetSystems[i].power == "") {
-                            targetSystems[i].power = controlSphereSystem.power;
+                    if (!(targetSystems[i].power).includes(detailedContestedSystems[j].power)
+                        && !(targetSystems[i].power).includes(controlSphereSystem.power)) {
+                        if (contestPowerStrSecond.includes(detailedContestedSystems[j].power)) {
+                            otherContestCounter += 1;
+                            contestPowerStrSecond += ` x${otherContestCounter}`;
                         }
-                        targetSystems[i].power += `, ${detailedContestedSystems[j].power}`;
+                        if (contestPowerStrSecond === '' || contestPowerStrFirst === `${controlSphereSystem.power} (self-contested)`) {
+                            contestPowerStrSecond += detailedContestedSystems[j].power;
+                            otherContestCounter = 1;
+                        } else if (!contestPowerStrSecond.includes(detailedContestedSystems[j].power)) {
+                            contestPowerStrSecond += `, ${detailedContestedSystems[j].power}`;
+                            otherContestCounter = 1;
+                        }
                     // self-contest
-                    } else if ((targetSystems[i].power).includes(controlSphereSystem.power) && !(targetSystems[i].power).includes("(self-contested)")) {
-                        targetSystems[i].power += ` (self-contested)`;
+                    } else if ((targetSystems[i].power).includes(controlSphereSystem.power)) {
+                        if (selfContestCounter >= 1) {
+                            selfContestCounter += 1;
+                        } else {
+                            selfContestCounter = 1;
+                            contestPowerStrFirst = `${controlSphereSystem.power} (self-contested)`;
+                        }
                     }
                     // contested spheres
-                    if (targetSystems[i].contests === "") {
+                    if (targetSystems[i].contests === '') {
                         targetSystems[i].contests = detailedContestedSystems[j].control_name;
                     } else {
                         targetSystems[i].contests += `, ${detailedContestedSystems[j].control_name}`;
                     }
-                    
                 }
             }
+            if (selfContestCounter > 1) {
+                contestPowerStrFirst += ` x${selfContestCounter}`;
+            }
+            targetSystems[i].power = `${contestPowerStrFirst}${contestPowerStrSecond}`;
         }
     }
 
