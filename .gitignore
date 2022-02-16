@@ -1,6 +1,6 @@
 config.json
 node_modules
-.eslintrc.json
+.eslintrc.js
 data/*
 !data/trello_list.txt
 key.txt
