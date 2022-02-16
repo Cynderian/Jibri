@@ -97,7 +97,7 @@ exports.run = (client, message, args) => {
                 power = allSystems[i].power;
             }
             if (override === 1) {
-                sphereType = 'Expansion'
+                sphereType = 'Expansion';
                 controlSphereSystem.power_state = null;
             }
             break;
@@ -266,13 +266,6 @@ exports.run = (client, message, args) => {
             return 0;
         });
 
-        // filter/trim list
-        for (let i = 1; i < detailedContestedSystems.length; i++) {
-            if (detailedContestedSystems[i].name === detailedContestedSystems[i-1].name) {
-
-            }
-        }
-
         // total contested CC counts
         for (let i = 0; i < detailedContestedSystems.length; i++) {
             if (detailedContestedSystems[i].power !== controlSphereSystem.power) {
@@ -285,7 +278,7 @@ exports.run = (client, message, args) => {
             }
         }
         console.log(detailedContestedSystems);
-        contestedStr = `Contested CC with other powers: ${otherContestedCC}CC\nSelf-contested CC: ${selfContestedCC}CC\n`
+        contestedStr = `Contested CC with other powers: ${otherContestedCC}CC\nSelf-contested CC: ${selfContestedCC}CC\n`;
         for (let i = 0; i < 12; i++) {
             const system = {};
             system.power = undefined;
@@ -327,8 +320,8 @@ exports.run = (client, message, args) => {
                 onelineContestedSystems[10].power = detailedContestedSystems[i].power;
                 onelineContestedSystems[10].cc += detailedContestedSystems[i].cc;
             } else {
-                console.log('error')
-                console.log(detailedContestedSystems[i])
+                console.log('error');
+                console.log(detailedContestedSystems[i]);
             }
         }
         for (let i = 0; i < onelineContestedSystems.length; i++) {
@@ -436,7 +429,7 @@ exports.run = (client, message, args) => {
         }
         // contests modifier
         if (contests === 1) {
-            targetSystems[i].contests = "";
+            targetSystems[i].contests = '';
         }
     }
 
@@ -498,7 +491,7 @@ exports.run = (client, message, args) => {
                             contestPowerStrSecond += `, ${detailedContestedSystems[j].power}`;
                             otherContestCounter = 1;
                         }
-                    // self-contest
+                        // self-contest
                     } else if ((targetSystems[i].power).includes(controlSphereSystem.power)) {
                         if (selfContestCounter >= 1) {
                             selfContestCounter += 1;
@@ -528,9 +521,10 @@ exports.run = (client, message, args) => {
         warningStr = '[ Warning: Target system is already exploited, footer favorability ratios may be inaccurate ]\n';
     } else if (warningFlag === 'Expansion') {
         warningStr = '[ Warning: Target system is currently being expanded from ]\n';
-    }
+    } 
 
     // Control system adjustments
+    let oppOrFortInfo = '';
     if (sphereType === 'Control') {
         if (favorables > neutrals && favorables > unfavorables) {
             oppOrFortInfo = `= ${fort} to fortify =`;
@@ -544,14 +538,14 @@ exports.run = (client, message, args) => {
     let infoEnd = '';
     if (sphereType === 'Expansion') {
         if (favorables > neutrals && favorables > unfavorables) {
-            infoStart = '= '
-            infoEnd = ' (favorable) ='
+            infoStart = '= ';
+            infoEnd = ' (favorable) =';
         } else if (unfavorables > neutrals && unfavorables > favorables) {
-            infoStart = '['
-            infoEnd = ']'
+            infoStart = '[';
+            infoEnd = ']';
         } else {
-            infoStart = '| '
-            infoEnd = ' |'
+            infoStart = '| ';
+            infoEnd = ' |';
         }
         oppOrFortInfo = `${oppOrFortNumber}:1 triggers`;
     }
