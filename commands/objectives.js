@@ -1,4 +1,5 @@
 const fs = require('fs');
+const process = require('process');
 exports.run = (client, message, args) => {
     const today = new Date();
     console.log('working on objectives');
@@ -26,9 +27,8 @@ exports.run = (client, message, args) => {
     }
     // find system in EDDB
     let data = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
-    const allSystems = JSON.parse(data);
-    data = fs.readFileSync('./data/stations.json', 'utf8');
-    const allStations = JSON.parse(data);
+    let allSystems = JSON.parse(data);
+    data = undefined;
 
     const objectivesSystems = [];
     for (let i = 0; i < allSystems.length; i++) {
@@ -37,32 +37,45 @@ exports.run = (client, message, args) => {
                 // get name, controlling faction, closest controlled star station, closest controlled Horizions planetary landable (if any), largest controlled pad
                 // find closest controlled landing pad, then 
                 let system = {};
+                system.id = allSystems[i].id;
+                system.controlling_minor_faction_id = allSystems[i].controlling_minor_faction_id;
                 system.name = allSystems[i].name;
                 system.faction = allSystems[i].controlling_minor_faction;
                 system.stations = [];
-                let maxLandingPadSize = 'M';
-                for (let k = 0; k < allStations.length; k++) {
-                    // station is in system, and controlled by system owner, and not odyssey only
-                    if (allSystems[i].id === allStations[k].system_id 
-                    && allSystems[i].controlling_minor_faction_id === allStations[k].controlling_minor_faction_id
-                    && allStations[k].type !== 'Odyssey Settlement') {
-                        if (allStations[k].max_landing_pad_size === 'L') {
-                            maxLandingPadSize = 'L';
-                        }
-                        let station = {};
-                        station.name = allStations[k].name;
-                        station.landingPadSize = allStations[k].max_landing_pad_size;
-                        station.isPlanetary = allStations[k].is_planetary;
-                        station.distance = allStations[k].distance_to_star;
-                        (system.stations).push(station);
-                    }
-                }
-                system.maxLandingPadSize = maxLandingPadSize;
+                system.maxLandingPadSize = 'M';
                 objectivesSystems.push(system);
-                continue;
+                break;
             }
         }
     }
+
+    allSystems = undefined;
+    data = fs.readFileSync('./data/stations.json', 'utf8');
+    let allStations = JSON.parse(data);
+    data = undefined;
+
+    for (let i = 0; i < objectivesSystems.length; i++) {
+        for (let j = 0; j < allStations.length; j++) {
+            // station is in system, and controlled by system owner, and not odyssey only
+            if (objectivesSystems[i].id === allStations[j].system_id 
+            && objectivesSystems[i].controlling_minor_faction_id === allStations[j].controlling_minor_faction_id
+            && allStations[j].type !== 'Odyssey Settlement') {
+                if (allStations[j].max_landing_pad_size === 'L') {
+                    objectivesSystems[i].maxLandingPadSize = 'L';
+                }
+                let station = {};
+                station.name = allStations[j].name;
+                station.landingPadSize = allStations[j].max_landing_pad_size;
+                station.isPlanetary = allStations[j].is_planetary;
+                station.distance = allStations[j].distance_to_star;
+                (objectivesSystems[i].stations).push(station);
+            }
+        }
+    }
+    
+
+    allStations = undefined;
+
     if (objectivesSystems.length !== inputSystems.length) {
         return message.channel.send('One or more system names were not found, program stopping.');
     }
@@ -108,8 +121,7 @@ exports.run = (client, message, args) => {
             iter += 1;
         }
         if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'L' && objectivesSystems[i].stations[iter].isPlanetary === false) {
-            (objectivesSystems[i].stations).splice(iter);
-            break;
+            iter += 1;
         }
         // remove all remaining systems
         (objectivesSystems[i].stations).splice(iter);
@@ -136,4 +148,7 @@ exports.run = (client, message, args) => {
 
     // output
     message.channel.send(messageStart + messageBody + messageEnd);
+
+    const used = process.memoryUsage().heapUsed / 1024 / 1024;
+    console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
 };
