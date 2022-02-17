@@ -8,6 +8,7 @@ exports.run = (client, message) => {
     const profitables = '\t~profitables <power> shows all existing profitable expansions for a power\n';
     // const threats = '!- Beta Command -! ~threats <friendly power> <hostile power> <distance from main star, in lightseconds> shows all systems with a Large landing pad within an input amount from Aisling space. This command does not currently publicly usable due to the massive amount of data it processes, please ping @Cynder#7567 for use.\n';
     const cc = '\t~cc <power> shows the total cc and systems controlled and exploited by a power. Good for confirming if database has been updated.\n';
+    const objectives = '\t~objectives <system 1>, <system 2>, ...<system n> to create a copy-pastable list of objectives, **only works on maitenance targets**.';
     const postamble = 'The dates shown reflect when the leads were last updated, and are *roughly* autocorrected to the last tick time (faulty since EDO). Data is pulled from EDDB daily at 1am CST\n';
-    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${sphere}\n${multisphere}\n${scout}\n${faction}\n${profitables}\n${cc}\n ${postamble}\`\`\``);
+    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${sphere}\n${multisphere}\n${scout}\n${faction}\n${profitables}\n${cc}\n${objectives}\n ${postamble}\n\`\`\``);
 };
