@@ -556,7 +556,7 @@ exports.run = (client, message, args) => {
     // info start/end (favorability)
 
     // header
-    const header = `= ${sphere} ${sphereType} Sphere Analysis =\n${infoStart}${oppOrFortInfo}${infoEnd}\n${warningStr}\n`;
+    const header = `= ${sphere} ${sphereType} Sphere Analysis =\n${infoStart}${oppOrFortInfo}${infoEnd} ${HQDistance.toFixed(2)}ly from HQ\n${warningStr}\n`;
     // body
     if (targetSystems.length === 0) {
         message.channel.send('`No systems found`');
