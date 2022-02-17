@@ -16,7 +16,7 @@ exports.run = (client, message, args) => {
     input = capitalize(removeQuotes(input));
     input = inputPowerFilter(message, input);
     if (input === undefined) {
-        return message.channel.send("Power not found.");
+        return message.channel.send('Power not found.');
     }
 
     const powerSystems = [];
