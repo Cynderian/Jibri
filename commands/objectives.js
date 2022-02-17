@@ -1,5 +1,5 @@
 const fs = require('fs');
-const process = require('process');
+const StreamArray = require( 'stream-json/streamers/StreamArray');
 exports.run = (client, message, args) => {
     const today = new Date();
     console.log('working on objectives');
@@ -50,105 +50,101 @@ exports.run = (client, message, args) => {
     }
 
     allSystems = undefined;
-    data = fs.readFileSync('./data/stations.json', 'utf8');
-    let allStations = JSON.parse(data);
-    data = undefined;
 
-    for (let i = 0; i < objectivesSystems.length; i++) {
-        for (let j = 0; j < allStations.length; j++) {
-            // station is in system, and controlled by system owner, and not odyssey only
-            if (objectivesSystems[i].id === allStations[j].system_id 
-            && objectivesSystems[i].controlling_minor_faction_id === allStations[j].controlling_minor_faction_id
-            && allStations[j].type !== 'Odyssey Settlement') {
-                if (allStations[j].max_landing_pad_size === 'L') {
-                    objectivesSystems[i].maxLandingPadSize = 'L';
+    message.channel.send('Searching for stations... this may take some time.');
+    const jsonStream = StreamArray.withParser();
+    fs.createReadStream('./data/stations.json').pipe(jsonStream.input);
+    jsonStream.on('data', ({key, value}) => {
+        // station is in system, and controlled by system owner, and not odyssey only
+        if (value.type !== 'Odyssey Settlement') {
+            for (let i = 0; i < objectivesSystems.length; i++) {
+                if (objectivesSystems[i].id === value.system_id 
+                && objectivesSystems[i].controlling_minor_faction_id === value.controlling_minor_faction_id) {
+                    if (value.max_landing_pad_size === 'L') {
+                        objectivesSystems[i].maxLandingPadSize = 'L';
+                    }
+                    let station = {};
+                    station.name = value.name;
+                    station.landingPadSize = value.max_landing_pad_size;
+                    station.isPlanetary = value.is_planetary;
+                    station.distance = value.distance_to_star;
+                    (objectivesSystems[i].stations).push(station);
                 }
-                let station = {};
-                station.name = allStations[j].name;
-                station.landingPadSize = allStations[j].max_landing_pad_size;
-                station.isPlanetary = allStations[j].is_planetary;
-                station.distance = allStations[j].distance_to_star;
-                (objectivesSystems[i].stations).push(station);
             }
         }
-    }
+    });
+    jsonStream.on('end', () => {
+        if (objectivesSystems.length !== inputSystems.length) {
+            return message.channel.send('One or more system names were not found, program stopping.');
+        }
+        // filter system stations
+        for (let i = 0; i < objectivesSystems.length; i++) {
+            if ((objectivesSystems[i].stations).length === 0) {
+                return message.channel.send(`Something went wrong; no controlled stations found in ${objectivesSystems[i].name}, exiting...`);
+            }
+            // sort by distance, ascending
+            (objectivesSystems[i].stations).sort((a, b) => a.distance - b.distance);
     
-
-    allStations = undefined;
-
-    if (objectivesSystems.length !== inputSystems.length) {
-        return message.channel.send('One or more system names were not found, program stopping.');
-    }
-    // filter system stations
-    for (let i = 0; i < objectivesSystems.length; i++) {
-        if ((objectivesSystems[i].stations).length === 0) {
-            return message.channel.send(`Something went wrong; no controlled stations found in ${objectivesSystems[i].name}, exiting...`);
-        }
-        // sort by distance, ascending
-        (objectivesSystems[i].stations).sort((a, b) => a.distance - b.distance);
-
-        let iter = 0;
-        if (objectivesSystems[i].stations[iter].landingPadSize === 'M' && objectivesSystems[i].stations[iter].isPlanetary === true) {
-            for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
-                if (objectivesSystems[i].stations[j].landingPadSize === 'M' && objectivesSystems[i].stations[j].isPlanetary === true) {
-                    (objectivesSystems[i].stations).splice(j, j);
+            let iter = 0;
+            if (objectivesSystems[i].stations[iter].landingPadSize === 'M' && objectivesSystems[i].stations[iter].isPlanetary === true) {
+                for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
+                    if (objectivesSystems[i].stations[j].landingPadSize === 'M' && objectivesSystems[i].stations[j].isPlanetary === true) {
+                        (objectivesSystems[i].stations).splice(j, j);
+                    }
                 }
+                iter += 1;
             }
-            iter += 1;
-        }
-        if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'M') {
-            for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
-                if (objectivesSystems[i].stations[j].landingPadSize === 'M') {
-                    (objectivesSystems[i].stations).splice(j, j);
+            if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'M') {
+                for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
+                    if (objectivesSystems[i].stations[j].landingPadSize === 'M') {
+                        (objectivesSystems[i].stations).splice(j, j);
+                    }
                 }
+                iter += 1;
             }
-            iter += 1;
-        }
-        if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'L' && objectivesSystems[i].stations[iter].isPlanetary === true) {
-            for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
-                if (objectivesSystems[i].stations[j].landingPadSize === 'L' && objectivesSystems[i].stations[j].isPlanetary === true) {
-                    (objectivesSystems[i].stations).splice(j, j);
+            if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'L' && objectivesSystems[i].stations[iter].isPlanetary === true) {
+                for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
+                    if (objectivesSystems[i].stations[j].landingPadSize === 'L' && objectivesSystems[i].stations[j].isPlanetary === true) {
+                        (objectivesSystems[i].stations).splice(j, j);
+                    }
                 }
+                iter += 1;
             }
-            iter += 1;
-        }
-        if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'M') {
-            for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
-                if (objectivesSystems[i].stations[j].landingPadSize === 'M') {
-                    (objectivesSystems[i].stations).splice(j, j);
+            if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'M') {
+                for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
+                    if (objectivesSystems[i].stations[j].landingPadSize === 'M') {
+                        (objectivesSystems[i].stations).splice(j, j);
+                    }
                 }
+                iter += 1;
             }
-            iter += 1;
-        }
-        if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'L' && objectivesSystems[i].stations[iter].isPlanetary === false) {
-            iter += 1;
-        }
-        // remove all remaining systems
-        (objectivesSystems[i].stations).splice(iter);
-    }
-    // plug needed data into format (lead faction name, station types/pads)
-    const messageStart = '\n```\n';
-    let messageBody = '';
-    for (let i = 0; i < objectivesSystems.length; i++) {
-        if (i > 0) {
-            messageBody += '-\n';
-        }
-        messageBody += `:globe_with_meridians: **${objectivesSystems[i].name}** - Run missions and passengers for "${objectivesSystems[i].faction}", turn in their bounties, and turn in cartographic data and trade for a profit at `;
-        for (let j = 0; j < (objectivesSystems[i].stations).length; j++) {
-            let messageSurface = '';
-            if (objectivesSystems[i].stations[j].isPlanetary) {
-                messageSurface = ' Surface';
+            if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'L' && objectivesSystems[i].stations[iter].isPlanetary === false) {
+                iter += 1;
             }
-            messageBody += `${objectivesSystems[i].stations[j].name} (${objectivesSystems[i].stations[j].landingPadSize}${messageSurface}), `;
+            // remove all remaining systems
+            (objectivesSystems[i].stations).splice(iter);
         }
-        messageBody = messageBody.slice(0, -2);
-        messageBody += `. Largest landable pad is ${objectivesSystems[i].maxLandingPadSize}.\n`;
-    }
-    const messageEnd = '\n```';
-
-    // output
-    message.channel.send(messageStart + messageBody + messageEnd);
-
-    const used = process.memoryUsage().heapUsed / 1024 / 1024;
-    console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
+        // plug needed data into format (lead faction name, station types/pads)
+        const messageStart = '\n```\n';
+        let messageBody = '';
+        for (let i = 0; i < objectivesSystems.length; i++) {
+            if (i > 0) {
+                messageBody += '-\n';
+            }
+            messageBody += `:globe_with_meridians: **${objectivesSystems[i].name}** - Run missions and passengers for "${objectivesSystems[i].faction}", turn in their bounties, and turn in cartographic data and trade for a profit at `;
+            for (let j = 0; j < (objectivesSystems[i].stations).length; j++) {
+                let messageSurface = '';
+                if (objectivesSystems[i].stations[j].isPlanetary) {
+                    messageSurface = ' Surface';
+                }
+                messageBody += `${objectivesSystems[i].stations[j].name} (${objectivesSystems[i].stations[j].landingPadSize}${messageSurface}), `;
+            }
+            messageBody = messageBody.slice(0, -2);
+            messageBody += `. Largest landable pad is ${objectivesSystems[i].maxLandingPadSize}.\n`;
+        }
+        const messageEnd = '\n```';
+    
+        // output
+        message.channel.send(messageStart + messageBody + messageEnd);
+    });
 };
