@@ -123,7 +123,11 @@ exports.run = (client, message, args) => {
         }
         messageBody += `:globe_with_meridians: **${objectivesSystems[i].name}** - Run missions and passengers for "${objectivesSystems[i].faction}", turn in their bounties, and turn in cartographic data and trade for a profit at `;
         for (let j = 0; j < (objectivesSystems[i].stations).length; j++) {
-            messageBody += `${objectivesSystems[i].stations[j].name} (${objectivesSystems[i].stations[j].landingPadSize}), `;
+            let messageSurface = '';
+            if (objectivesSystems[i].stations[j].isPlanetary) {
+                messageSurface = ' Surface';
+            }
+            messageBody += `${objectivesSystems[i].stations[j].name} (${objectivesSystems[i].stations[j].landingPadSize}${messageSurface}), `;
         }
         messageBody = messageBody.slice(0, -2);
         messageBody += `. Largest landable pad is ${objectivesSystems[i].maxLandingPadSize}.\n`;
