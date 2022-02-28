@@ -4,7 +4,7 @@ exports.run = (client, message, args) => {
     const today = new Date();
     console.log('working on objectives');
     message.channel.send('Beta feature: Only works for maitenance targets currently\n\n');
-    message.channel.send('Controlled stations are picked in priority of: L spaceport > L planetary => M spaceport > M planetary > closest');
+    // message.channel.send('Controlled stations are picked in priority of: L spaceport > L planetary => M spaceport > M planetary > closest');
     // tell machine list of comma delineated systems
     const inputSystems = [];
     if (!args.length) {
@@ -31,16 +31,16 @@ exports.run = (client, message, args) => {
     data = undefined;
 
     const objectivesSystems = [];
-    for (let i = 0; i < allSystems.length; i++) {
-        for (let j = 0; j < inputSystems.length; j++) {
-            if ((allSystems[i].name).toLowerCase() === (inputSystems[j]).toLowerCase()) {
+    for (let i = 0; i < inputSystems.length; i++) {
+        for (let j = 0; j < allSystems.length; j++) {
+            if ((allSystems[j].name).toLowerCase() === (inputSystems[i]).toLowerCase()) {
                 // get name, controlling faction, closest controlled star station, closest controlled Horizions planetary landable (if any), largest controlled pad
                 // find closest controlled landing pad, then 
                 let system = {};
-                system.id = allSystems[i].id;
-                system.controlling_minor_faction_id = allSystems[i].controlling_minor_faction_id;
-                system.name = allSystems[i].name;
-                system.faction = allSystems[i].controlling_minor_faction;
+                system.id = allSystems[j].id;
+                system.controlling_minor_faction_id = allSystems[j].controlling_minor_faction_id;
+                system.name = allSystems[j].name;
+                system.faction = allSystems[j].controlling_minor_faction;
                 system.stations = [];
                 system.maxLandingPadSize = 'M';
                 objectivesSystems.push(system);
@@ -69,6 +69,7 @@ exports.run = (client, message, args) => {
                     station.isPlanetary = value.is_planetary;
                     station.distance = value.distance_to_star;
                     (objectivesSystems[i].stations).push(station);
+                    break;
                 }
             }
         }
@@ -131,7 +132,13 @@ exports.run = (client, message, args) => {
             if (i > 0) {
                 messageBody += '-\n';
             }
-            messageBody += `:globe_with_meridians: **${objectivesSystems[i].name}** - Run missions and passengers for "${objectivesSystems[i].faction}", turn in their bounties, and turn in cartographic data and trade for a profit at `;
+            let maxLandingPadEmote = '';
+            if (objectivesSystems[i].maxLandingPadSize === 'M') {
+                maxLandingPadEmote = ':m:';
+            } else {
+                maxLandingPadEmote = ':regional_indicator_l:';
+            }
+            messageBody += `:globe_with_meridians: ${maxLandingPadEmote} **${objectivesSystems[i].name}** - Run missions and passengers for "${objectivesSystems[i].faction}", turn in their bounties, and turn in cartographic data and trade for a profit at `;
             for (let j = 0; j < (objectivesSystems[i].stations).length; j++) {
                 let messageSurface = '';
                 if (objectivesSystems[i].stations[j].isPlanetary) {
@@ -140,7 +147,7 @@ exports.run = (client, message, args) => {
                 messageBody += `${objectivesSystems[i].stations[j].name} (${objectivesSystems[i].stations[j].landingPadSize}${messageSurface}), `;
             }
             messageBody = messageBody.slice(0, -2);
-            messageBody += `. Largest landable pad is ${objectivesSystems[i].maxLandingPadSize}.\n`;
+            messageBody += '.\n';
         }
         const messageEnd = '\n```';
     
