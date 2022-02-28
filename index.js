@@ -1,11 +1,12 @@
 const fs = require('fs');
 const Discord = require('discord.js');
 const config = require('./config.json');
-const { mirrorEddb } = require('./functions');
+const { mirrorEddb, objectivesStationsFilter } = require('./functions');
 const client = new Discord.Client();
 client.config = config;
 
 mirrorEddb();
+objectivesStationsFilter();
 
 fs.readdir('./events/', (err, files) => {
     if (err) return console.error(err);
