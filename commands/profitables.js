@@ -32,14 +32,27 @@ exports.run = (client, message, args) => {
     if (power === undefined) {
         return message.channel.send('Error reading power name, please try again');
     }
-    const obj = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
+    let obj = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()-1}_${today.getFullYear()}.json`, 'utf8');
     const allSystems = JSON.parse(obj);
+
+    obj = fs.readFileSync('./data/stations.json', 'utf8');    
+    let allStations = JSON.parse(obj);
+    obj = null;
 
     // find all expandable systems
     console.log('finding all expandable systems');
     const viableSystems = [];
     for (let i = 0; i < allSystems.length; i++) {
         if (allSystems[i].power_state === null) {
+            let pad = 'M';
+            for (let j = 0; j < allStations.length; j++) {
+                if (allSystems[i].id === allStations[j].system_id) {
+                    if (allStations[j].max_landing_pad_size === 'L' && allStations[j].type !== 'Odyssey Station') {
+                        pad = 'L';
+                    }
+                }
+            }
+            const HQDistance = HQDistances(power, allSystems[i].x, allSystems[i].y, allSystems[i].z);
             const system = {};
             system.name = allSystems[i].name;
             system.x = allSystems[i].x;
@@ -48,9 +61,12 @@ exports.run = (client, message, args) => {
             system.cc = 0;
             system.winters = 0;
             system.hudson = 0;
+            system.pad = pad;
+            system.triggers = ((Math.round(0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5)) / (Math.round(2750000 / (HQDistance ** 1.5) + 5000))).toFixed(2);
             viableSystems.push(system);
         }
     }
+
 
     console.log(`finding gross cc across ${viableSystems.length} viable systems`);
     for (let i = 0; i < viableSystems.length; i++) {
