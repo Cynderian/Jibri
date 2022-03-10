@@ -32,7 +32,7 @@ exports.run = (client, message, args) => {
     if (power === undefined) {
         return message.channel.send('Error reading power name, please try again');
     }
-    let obj = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()-1}_${today.getFullYear()}.json`, 'utf8');
+    let obj = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
     const allSystems = JSON.parse(obj);
 
     obj = fs.readFileSync('./data/stations.json', 'utf8');    
@@ -43,6 +43,12 @@ exports.run = (client, message, args) => {
     console.log('finding all expandable systems');
     const viableSystems = [];
     for (let i = 0; i < allSystems.length; i++) {
+        // filter out a power
+        /*
+        if (allSystems[i].power === 'Li Yong-Rui') {
+            allSystems[i].power = null;
+            allSystems[i].power_state = null;
+        }*/
         if (allSystems[i].power_state === null) {
             let pad = 'M';
             for (let j = 0; j < allStations.length; j++) {
@@ -62,8 +68,14 @@ exports.run = (client, message, args) => {
             system.winters = 0;
             system.hudson = 0;
             system.pad = pad;
-            system.triggers = ((Math.round(0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5)) / (Math.round(2750000 / (HQDistance ** 1.5) + 5000))).toFixed(2);
-            viableSystems.push(system);
+            // triggers always display as neutral
+            let triggers = ((Math.round(0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5)) / (Math.round(2750000 / (HQDistance ** 1.5) + 5000))).toFixed(2);
+            system.triggers = triggers;
+            // optional trigger threshold
+            /*
+            if (triggers <= 2.6) {
+                viableSystems.push(system);
+            }*/
         }
     }
 
