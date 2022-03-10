@@ -2,6 +2,8 @@ const request = require('request');
 const { exec } = require('child_process');
 const fetch = require('node-fetch');
 const fs = require('fs');
+const StreamArray = require( 'stream-json/streamers/StreamArray');
+const message = require('./events/message');
 
 function inputPowerFilter(message, input) {
     let casedInput = input.charAt(0).toUpperCase() + input.slice(1);
@@ -317,6 +319,7 @@ function mirrorEddb() {
     download(urlTwo, pathTwo, () => {
         const now = new Date();
         console.log(`EDDB station json mirrored at ${now}`);
+        objectivesStationsFilter();
     });
     let oldData = new Date();
     oldData = oldData.setDate(today.getDate() - 6); // find 6 days prior in ms
@@ -337,4 +340,62 @@ function removeQuotes(input) {
     return input;
 }
 
-module.exports = { inputPowerFilter, HQDistances, favorability, getURL, infLead, capitalize, popToCC, distLessThan, lastUpdated, mirrorEddb, removeQuotes };
+async function objectivesStationsFilter() {
+    const today = new Date();
+    const jsonStream = StreamArray.withParser();
+
+    // find system in EDDB
+    let data = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
+    let allSystems = JSON.parse(data);
+    data = undefined;
+    
+    // grab all friendly power control systems
+    const input = 'Aisling Duval';
+    const controlSystems = [];
+    for (let i = 0; i < allSystems.length; i++) {
+        if (allSystems[i].power === input && allSystems[i].power_state === 'Control') {
+            const controlSystem = {};
+            controlSystem.x = allSystems[i].x;
+            controlSystem.y = allSystems[i].y;
+            controlSystem.z = allSystems[i].z;
+            controlSystems.push(controlSystem);
+        }
+    }
+
+    // delete file if exists
+    if (fs.existsSync('./data/objectives_stations.json')) {
+        fs.unlinkSync('./data/objectives_stations.json');
+    }
+    
+    // loop through stations
+    fs.createReadStream('./data/stations.json').pipe(jsonStream.input);
+    jsonStream.on('data', ({key, value}) => {
+        for (let i = 0; i < allSystems.length; i++) {
+            let ADSystem = 0;
+            if (allSystems[i].id === value.system_id) {
+                for (let j = 0; j < controlSystems.length; j++) {
+                    // 45 to include all potential weapons
+                    if (distLessThan(45, allSystems[i].x, allSystems[i].y, allSystems[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z)) {
+                        ADSystem = 1;
+                    }
+                }
+                if (ADSystem === 1) {
+                    let station = `{"name":"${value.name}","system_id":${value.system_id},"max_landing_pad_size":"${value.max_landing_pad_size}","distance_to_star":${value.distance_to_star},"type":"${value.type}","is_planetary":${value.is_planetary},"controlling_minor_faction_id":${value.controlling_minor_faction_id}}`;
+                    fs.appendFile('./data/objectives_stations.json', station, err => {
+                        if (err) {
+                            console.error(err);
+                            return;
+                        }
+                    });
+                }
+                break;
+            }
+        }
+    });
+    jsonStream.on('end', () => {
+        console.log('objectivesStationFilter complete!');
+    });
+    console.log('objectivesStationFilter complete!');
+}
+
+module.exports = { inputPowerFilter, HQDistances, favorability, getURL, infLead, capitalize, popToCC, distLessThan, lastUpdated, mirrorEddb, removeQuotes, objectivesStationsFilter };
