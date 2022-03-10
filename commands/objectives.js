@@ -37,12 +37,34 @@ exports.run = (client, message, args) => {
                 // get name, controlling faction, closest controlled star station, closest controlled Horizions planetary landable (if any), largest controlled pad
                 // find closest controlled landing pad, then 
                 let system = {};
-                system.id = allSystems[j].id;
-                system.controlling_minor_faction_id = allSystems[j].controlling_minor_faction_id;
-                system.name = allSystems[j].name;
-                system.faction = allSystems[j].controlling_minor_faction;
-                system.stations = [];
-                system.maxLandingPadSize = 'M';
+                let inConflict = 0;
+                for (let k = 0; k < (allSystems[j].states).length; k++) {
+                    if (allSystems[j].states[k].name === 'Election' || allSystems[j].states[k].name === 'War' || allSystems[j].states[k].name === 'Civil War') {
+                        inConflict = 1;
+                    }
+                }
+                if (inConflict === 1) {
+                    system.id = '<Unknown>';
+                    system.controlling_minor_faction_id = '<Unknown>';
+                    system.name = '<Unknown>';
+                    system.faction = '<Unknown>';
+                    system.stations = [];
+                    system.maxLandingPadSize = '<Unknown>';
+
+                    let station = {};
+                    station.name = '<Unknown>';
+                    station.landingPadSize = '<Unknown>';
+                    station.isPlanetary = false;
+                    station.distance = 0;
+                    (system.stations).push(station);
+                } else {
+                    system.id = allSystems[j].id;
+                    system.controlling_minor_faction_id = allSystems[j].controlling_minor_faction_id;
+                    system.name = allSystems[j].name;
+                    system.faction = allSystems[j].controlling_minor_faction;
+                    system.stations = [];
+                    system.maxLandingPadSize = 'M';
+                }
                 objectivesSystems.push(system);
                 break;
             }
@@ -58,8 +80,10 @@ exports.run = (client, message, args) => {
         // station is in system, and controlled by system owner, and not odyssey only
         if (value.type !== 'Odyssey Settlement') {
             for (let i = 0; i < objectivesSystems.length; i++) {
-                if (objectivesSystems[i].id === value.system_id 
+                if (objectivesSystems[i].name !== '<Unknown>'
+                && objectivesSystems[i].id === value.system_id 
                 && objectivesSystems[i].controlling_minor_faction_id === value.controlling_minor_faction_id) {
+                    // on station/system match
                     if (value.max_landing_pad_size === 'L') {
                         objectivesSystems[i].maxLandingPadSize = 'L';
                     }
@@ -80,50 +104,54 @@ exports.run = (client, message, args) => {
         }
         // filter system stations
         for (let i = 0; i < objectivesSystems.length; i++) {
-            if ((objectivesSystems[i].stations).length === 0) {
-                return message.channel.send(`Something went wrong; no controlled stations found in ${objectivesSystems[i].name}, exiting...`);
-            }
-            // sort by distance, ascending
-            (objectivesSystems[i].stations).sort((a, b) => a.distance - b.distance);
+            if (objectivesSystems[i].stations[0].name === '<Unknown>') {
+                break;
+            } else {
+                if ((objectivesSystems[i].stations).length === 0) {
+                    return message.channel.send(`Something went wrong; no controlled stations found in ${objectivesSystems[i].name}, exiting...`);
+                }
+                // sort by distance, ascending
+                (objectivesSystems[i].stations).sort((a, b) => a.distance - b.distance);
     
-            let iter = 0;
-            if (objectivesSystems[i].stations[iter].landingPadSize === 'M' && objectivesSystems[i].stations[iter].isPlanetary === true) {
-                for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
-                    if (objectivesSystems[i].stations[j].landingPadSize === 'M' && objectivesSystems[i].stations[j].isPlanetary === true) {
-                        (objectivesSystems[i].stations).splice(j, j);
+                let iter = 0;
+                if (objectivesSystems[i].stations[iter].landingPadSize === 'M' && objectivesSystems[i].stations[iter].isPlanetary === true) {
+                    for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
+                        if (objectivesSystems[i].stations[j].landingPadSize === 'M' && objectivesSystems[i].stations[j].isPlanetary === true) {
+                            (objectivesSystems[i].stations).splice(j, j);
+                        }
                     }
+                    iter += 1;
                 }
-                iter += 1;
-            }
-            if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'M') {
-                for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
-                    if (objectivesSystems[i].stations[j].landingPadSize === 'M') {
-                        (objectivesSystems[i].stations).splice(j, j);
+                if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'M') {
+                    for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
+                        if (objectivesSystems[i].stations[j].landingPadSize === 'M') {
+                            (objectivesSystems[i].stations).splice(j, j);
+                        }
                     }
+                    iter += 1;
                 }
-                iter += 1;
-            }
-            if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'L' && objectivesSystems[i].stations[iter].isPlanetary === true) {
-                for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
-                    if (objectivesSystems[i].stations[j].landingPadSize === 'L' && objectivesSystems[i].stations[j].isPlanetary === true) {
-                        (objectivesSystems[i].stations).splice(j, j);
+                if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'L' && objectivesSystems[i].stations[iter].isPlanetary === true) {
+                    for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
+                        if (objectivesSystems[i].stations[j].landingPadSize === 'L' && objectivesSystems[i].stations[j].isPlanetary === true) {
+                            (objectivesSystems[i].stations).splice(j, j);
+                        }
                     }
+                    iter += 1;
                 }
-                iter += 1;
-            }
-            if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'M') {
-                for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
-                    if (objectivesSystems[i].stations[j].landingPadSize === 'M') {
-                        (objectivesSystems[i].stations).splice(j, j);
+                if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'M') {
+                    for (let j = iter + 1; j < objectivesSystems[i].stations.length; j++) {
+                        if (objectivesSystems[i].stations[j].landingPadSize === 'M') {
+                            (objectivesSystems[i].stations).splice(j, j);
+                        }
                     }
+                    iter += 1;
                 }
-                iter += 1;
+                if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'L' && objectivesSystems[i].stations[iter].isPlanetary === false) {
+                    iter += 1;
+                }
+                // remove all remaining systems
+                (objectivesSystems[i].stations).splice(iter);
             }
-            if (objectivesSystems[i].stations[iter] !== undefined && objectivesSystems[i].stations[iter].landingPadSize === 'L' && objectivesSystems[i].stations[iter].isPlanetary === false) {
-                iter += 1;
-            }
-            // remove all remaining systems
-            (objectivesSystems[i].stations).splice(iter);
         }
         // plug needed data into format (lead faction name, station types/pads)
         const messageStart = '\n```\n';
