@@ -14,6 +14,6 @@ module.exports = (client, message) => {
     console.log(trackedCommandStr);
     // command handling
     const cmd = client.commands.get(command);
-    if (!cmd) return console.log('whah');
+    if (!cmd) return console.log('whah - unknown command');
     cmd.run(client, message, args);
 };
