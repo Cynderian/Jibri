@@ -107,14 +107,14 @@ exports.run = (client, message, args) => {
     }
     console.log(`${allSystems.length} potential systems found`);
     obj = fs.readFileSync('./data/stations.json', 'utf8');
-    const data = JSON.parse(obj);
+    const allStations = JSON.parse(obj);
     const threatSystems = [];
     // filter out all systems without a large port && with a port <(distance)ls out
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < allStations.length; i++) {
         for (let j = 0; j < allSystems.length; j++) {
             // same system & large station & <(distance)ls from star % no power
-            if (data[i].system_id === allSystems[j].id && data[i].max_landing_pad_size === 'L' && data[i].distance_to_star <= distance) {
-                // filter out all repeated data from being added
+            if (allStations[i].system_id === allSystems[j].id && allStations[i].max_landing_pad_size === 'L' && allStations[i].type !== 'Odyssey Station' && allStations[i].distance_to_star <= distance) {
+                // filter out all repeated stations from being added
                 let exists = 0;
                 for (let k = 0; k < threatSystems.length; k++) {
                     if (threatSystems[k].name === allSystems[j].name) {
@@ -232,9 +232,18 @@ exports.run = (client, message, args) => {
         // threatSystems[i].intersect = intersectionString;
     }
 
+    for (let i = 0; i < threatSystems.length; i++) {
+        if (threatSystems[i].Aisling <= 43) {
+            threatSystems.splice(i, 1);
+            i -= 1;
+        }
+    }
+
+
     // sorts
     threatSystems.sort((a, b) => b.net_CC - a.net_CC); // sorts systems by net CC
     threatSystems.sort((a, b) => b.Aisling - a.Aisling); // sorts systems by contested CC
+    threatSystems.sort((a, b) => a.trigger - b.trigger); // sorts systems trigger (ascending)
 
     const columns = columnify(threatSystems); // tabularize info
     // In case of >2000 character message overflow (basically guaranteed)
@@ -257,7 +266,7 @@ exports.run = (client, message, args) => {
     }
 
     // write to txt
-    fs.writeFile('./data/targets.txt', columns, (err) => {
+    fs.writeFile('./data/weapons.txt', columns, (err) => {
         if (err) return console.log(err);
         console.log('file successfully saved');
     });
