@@ -42,6 +42,27 @@ exports.run = (client, message, args) => {
     // find all expandable systems
     console.log('finding all expandable systems');
     const viableSystems = [];
+    // add filtered out control sphere's systems to list, to be filtered out later
+    const toFilter = [];
+    for (let i = 0; i < allSystems.length; i++) {
+        // Control Spheres
+        if (allSystems[i].power_state === 'Control') {
+            // Control Sphere Names
+            if (allSystems[i].name === 'LTT 1289'
+            || allSystems[i].name === 'Gabjaujis'
+            || allSystems[i].name === 'Kaukamal'
+            || allSystems[i].name === 'Qi Yun Cech'
+            || allSystems[i].name === 'Zhao'
+            || allSystems[i].name === 'Ch\'eng'
+            || allSystems[i].name === 'Theta Octantis'
+            || allSystems[i].name === 'Tumuzgo'
+            || allSystems[i].name === 'Munshin') {
+                // within 15 ly
+                if (distLessThan(15, allSystems.x, allSystems.y, allS))
+                toFilter.push(allSystems.name);
+            }
+        }
+    }
     for (let i = 0; i < allSystems.length; i++) {
         // filter out a power
         /*
@@ -49,6 +70,23 @@ exports.run = (client, message, args) => {
             allSystems[i].power = null;
             allSystems[i].power_state = null;
         }*/
+        // filter out spheres
+        
+        if (allSystems[i].power_state === 'Control') {
+            if (allSystems[i].name === 'LTT1289'
+            || allSystems[i].name === 'Gabjaujis'
+            || allSystems[i].name === 'Kaukamal'
+            || allSystems[i].name === 'Qi Yun Cech'
+            || allSystems[i].name === 'Zhao'
+            || allSystems[i].name === 'Ch\'eng'
+            || allSystems[i].name === 'Theta Octantis'
+            || allSystems[i].name === 'Tumuzgo'
+            || allSystems[i].name === 'Munshin') {
+
+                allSystems[i].power = null;
+                allSystems[i].power_state = null;
+            }
+        }
         if (allSystems[i].power_state === null) {
             let pad = 'M';
             for (let j = 0; j < allStations.length; j++) {
