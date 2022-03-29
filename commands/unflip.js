@@ -2,26 +2,30 @@ const { capitalize, HQDistances, removeQuotes, inputPowerFilter, distLessThan, f
 const fs = require('fs');
 const columnify = require('columnify');
 
-function minMovesNeutralPlurality(flips, favorables, neutrals, unfavorables) {
-    if (favorables > neutrals) {
-        neutrals += 1;
-        favorables -= 1;
-    } else {
-        neutrals += 1;
-        unfavorables -= 1;
+function minFlipsPlurality(flips, favorables, neutrals, unfavorables) {
+    if (favorables === neutrals && neutrals === unfavorables && unfavorables === 0) {
+        return Infinity;
     }
-    flips += 1;
-    if (neutrals >= favorables && neutrals >= unfavorables) {
-        return flips;
-    } else {
-        return minMovesNeutralPlurality(flips, favorables, neutrals, unfavorables);
+    if (flips === 'unfavorable') {
+        if (unfavorables > favorables && unfavorables > neutrals) {
+            return 0;
+        }
+        if (favorables >= neutrals) {
+            return 1 + minFlipsPlurality(flips, favorables - 1, neutrals, unfavorables + 1);
+        }
+        if (neutrals > favorables) {
+            return 1 + minFlipsPlurality(flips, favorables, neutrals - 1, unfavorables + 1);
+        }
     }
+    if (flips === 'neutral') {
+        return Math.ceil((favorables - neutrals) / 2);
+    }
+    return -1;
 }
 
 exports.run = (client, message, args) => {
     console.log('working on unflip');
     message.channel.send('This is an experimental command; double check its output!');
-    message.channel.send('This command does not account of Odyssey landables with a Power Contact');
     message.channel.send('There are no automatic filters for net CC of these spheres, so that weapons may show up as targets. Please manually double check all planned targets');
     const today = new Date();
     if (!args.length) {
@@ -61,19 +65,14 @@ exports.run = (client, message, args) => {
             // goal is to find largest pad with shortest distance
             let maxLandingPadSize = 'M';
             let shortestDistanceToStar = -1;
-            let odysseyOnly = 0;
             try {
                 for (let j = 0; j < allStations.length; j++) {
                     if (allSystems[i].id === allStations[j].system_id) {
-                        if (allStations[j].max_landing_pad_size === 'L' && (shortestDistanceToStar > allStations[j].distance_to_star || shortestDistanceToStar === -1)) {
+                        if (allStations[j].max_landing_pad_size === 'L' 
+                        && (shortestDistanceToStar > allStations[j].distance_to_star || shortestDistanceToStar === -1)
+                        && allStations[i].type !== 'Odyssey Station') {
                             maxLandingPadSize = 'L';
                             shortestDistanceToStar = allStations[j].distance_to_star;
-                            // if L pad is Odyssey only (only type 13), make a addendum
-                            if (allStations[j].type === 'Odyssey Settlement' && allStations[j].type_id === 13) {
-                                odysseyOnly = 1;
-                            } else {
-                                odysseyOnly = 0;
-                            }
                         }
                         // update clostest M pad if no L pad is yet found
                         if (maxLandingPadSize === 'M') {
@@ -121,20 +120,22 @@ exports.run = (client, message, args) => {
             const fortMerits = Math.round(1 * (0.389 * (HQDistance ** 2) - 4.41 * HQDistance + 5012.5));
             let meritsAdded = 0;
             let meritsAddedAgain = 0;
-            let systemsAwayFromUnflip = 0;
             controlSystem.if = '';
-            controlSystem.minimum_flips = '';
+            controlSystem.min_flips = '';
+            let minFlipsTmp = -1;
             // if favorable, find value for flipping to both neutral or unfavorable (2 entries)
             if (favorables > neutrals && favorables > unfavorables) {
                 meritsAdded = Math.round(.5 * fortMerits); // favorable to neutral
                 meritsAddedAgain = fortMerits; // favorable to unfavorable
                 controlSystem.if = 'Neutral';
-                controlSystem.minimum_flips = minMovesNeutralPlurality(0, favorables, neutrals, unfavorables);
+                minFlipsTmp = minFlipsPlurality('unfavorable', favorables, neutrals, unfavorables);
+                controlSystem.min_flips = minFlipsPlurality('neutral', favorables, neutrals, unfavorables);
             }
             // if neutral, find value for flipping unfavorable
             if (neutrals >= favorables && neutrals >= unfavorables) {
                 meritsAdded = Math.round(.5 * fortMerits); // neutral to unfavorable
                 controlSystem.if = 'Unfavorable';
+                controlSystem.min_flips = minFlipsPlurality('unfavorable', favorables, neutrals, unfavorables);
             }
 
 
@@ -170,43 +171,44 @@ exports.run = (client, message, args) => {
                 const ladenTwo = Math.ceil(HQDistance / ladenRange);
                 const unladenTwo = Math.ceil(HQDistance / unladenRange);
                 const additionalTwo = Math.ceil((fortMerits + meritsAddedAgain) / cargoMax) - Math.ceil(fortMerits / cargoMax);
-                extraSystem.jumps_added = additionalTwo * (ladenTwo + unladenTwo);
+                let jmpsAddTmp = additionalTwo * (ladenTwo + unladenTwo);
+                extraSystem.jumps_added = jmpsAddTmp;
                 extraSystem.sc_distance = shortestDistanceToStar;
                 extraSystem.pad = maxLandingPadSize;
                 extraSystem.if = 'Unfavorable';
+                extraSystem.min_flips = minFlipsTmp;
+                extraSystem.value = jmpsAddTmp/minFlipsTmp;
                 unflippableSystems.push(extraSystem);
             }
 
             const tmp = controlSystem.if;
+            const tmp2 = controlSystem.min_flips;
             delete controlSystem.if;
+            delete controlSystem.min_flips;
             controlSystem.jumps_added = jumpsAdded;
             controlSystem.sc_distance = shortestDistanceToStar;
             controlSystem.pad = maxLandingPadSize;
             controlSystem.if = tmp;
+            controlSystem.min_flips = tmp2;
+            controlSystem.value = jumpsAdded/tmp2;
             unflippableSystems.push(controlSystem);
         }
     }
 
     // sorts
-    // jumps_added -> sc_distance
+    // value -> sc_distance
     unflippableSystems.sort((a, b) => b.sc_distance - a.sc_distance);
-    unflippableSystems.sort((a, b) => b.jumps_added - a.jumps_added);
+    unflippableSystems.sort((a, b) => b.value - a.value);
     
-    // output main block(s)
-    let block = '';
-    let subSystems = [];
     for (let i = 0; i < unflippableSystems.length; i++) {
-        subSystems.push(unflippableSystems[i]);
-        if (i > 0 && i % 20 === 0) {
-            block = columnify(subSystems);
-            message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
-            subSystems = [];
-        }
+        unflippableSystems[i].value = (unflippableSystems[i].value).toFixed(1);
     }
-    // print remainder of systems
-    if (subSystems.length !== 0) {
-        block = columnify(subSystems);
-        message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
-    }
+    // write to txt
+    const columns = columnify(unflippableSystems);
+    fs.writeFile(`./data/unflip_${inputPower}.txt`, columns, (err) => {
+        if (err) return console.log(err);
+        console.log('file successfully saved');
+        message.channel.send('File sucessfully saved.');
+    });
     
 };
