@@ -58,6 +58,8 @@ exports.run = (client, message, args) => {
     let neutrals = 0;
     let favor = '';
     let warningFlag = '';
+    let contestsMagic = 0;
+    let expansionControlTrigger = 0;
 
     // find input system's coords to use in distLessThan
     let sphereType = 'Expansion';
@@ -81,7 +83,9 @@ exports.run = (client, message, args) => {
             controlSphereSystem.power = allSystems[i].power;
             controlSphereSystem.state = allSystems[i].power_state;
 
-            grossCC += popToCC(allSystems[i].population);
+            if (allSystems[i].state === 'Control') {
+                grossCC += popToCC(allSystems[i].population);
+            }
 
             if (allSystems[i].power_state === 'Control') {
                 sphereType = 'Control';
@@ -131,7 +135,11 @@ exports.run = (client, message, args) => {
             if (distLessThan(15, controlSphereSystem.x, controlSphereSystem.y, controlSphereSystem.z, allSystems[i].x, allSystems[i].y, allSystems[i].z) === true) {
                 // filter out control system
                 if (sphere === allSystems[i].name) {
-                    continue;
+                    // contests modification
+                    if (contests !== 1 || controlSphereSystem.state === 'Control' || controlSphereSystem.power === power) {
+                        continue;
+                    }
+                    contestsMagic = 1;
                 }
                 const lastTick = lastUpdated(allSystems[i].minor_factions_updated_at * 1000); // convert from unix timestamp
 
@@ -163,14 +171,22 @@ exports.run = (client, message, args) => {
                         && allSystems[j].population > 0
                         && distLessThan(15, allSystems[i].x, allSystems[i].y, allSystems[i].z, allSystems[j].x, allSystems[j].y, allSystems[j].z) === true
                         && allSystems[j].power_state === 'Control'
-                        && allSystems[j].name !== controlSphereSystem.name) {
-                            // contested control systems
+                        && (allSystems[j].name !== controlSphereSystem.name || (controlSphereSystem.state !== 'Control' && controlSphereSystem.power !== power))) {
+                            // contested systems
                             const contestedSystem = {};
                             contestedSystem.name = allSystems[i].name;
                             contestedSystem.control_name = allSystems[j].name;
                             contestedSystem.power = allSystems[j].power;
                             contestedSystem.cc = popToCC(allSystems[i].population);
-                            detailedContestedSystems.push(contestedSystem);
+                            let repeat = 0;
+                            for (let k = 0; k < detailedContestedSystems.length; k++) {
+                                if (allSystems[i].name === detailedContestedSystems[k].name && allSystems[j].power === detailedContestedSystems[k].power) {
+                                    repeat = 1;
+                                }
+                            }
+                            if (repeat === 0) {
+                                detailedContestedSystems.push(contestedSystem);
+                            }
                         }
                     }
                 }
@@ -189,7 +205,8 @@ exports.run = (client, message, args) => {
                 if (tmp === -1) { console.log('favorability error'); }
                 favor = `${favorables}/${neutrals}/${unfavorables}`;
                 // Gross CC
-                if (sphereType === 'Expansion' && allSystems[i].power_state === null) {
+                if (sphereType === 'Expansion' && (allSystems[i].power_state !== 'Exploited' && allSystems[i].power_state !== 'Control')) {
+                    console.log(allSystems[i].name)
                     grossCC += popToCC(allSystems[i].population);
                 }
                 if (sphereType === 'Control' && allSystems[i].power_state === 'Exploited') {
@@ -209,7 +226,7 @@ exports.run = (client, message, args) => {
                             tmpnum += 1;
                         }
                     }
-                    if (tmpnum === 1) {
+                    if (tmpnum === 1 ) {
                         contestedSystems.push(system2);
                         contestedCC += tmp2;
                     }
@@ -225,6 +242,10 @@ exports.run = (client, message, args) => {
                     system2.power = allSystems[i].power;
                     system2.cc = popToCC(allSystems[i].population);
                     contestedCC += popToCC(allSystems[i].population);
+                    if (expansionControlTrigger === 0) {
+                        contestedCC += controlSphereSystem.cc;
+                        expansionControlTrigger = 1;
+                    }
                     contestedSystems.push(system2);
                 }
             }
@@ -277,9 +298,8 @@ exports.run = (client, message, args) => {
                 selfContestedCC += detailedContestedSystems[i].cc;
             }
         }
-        console.log(detailedContestedSystems);
         contestedStr = `Contested CC with other powers: ${otherContestedCC}CC\nSelf-contested CC: ${selfContestedCC}CC\n`;
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 12; i++) { // 12 = number of powers + 1
             const system = {};
             system.power = undefined;
             system.cc = 0;
@@ -337,6 +357,7 @@ exports.run = (client, message, args) => {
             system.cc = 0;
             onelineContestedSystems.push(system);
         }
+        contestedSystems.push(controlSphereSystem);
         for (let i = 0; i < contestedSystems.length; i++) {
             if (contestedSystems[i].power === 'Zachary Hudson') {
                 onelineContestedSystems[0].power = contestedSystems[i].power;
@@ -376,6 +397,7 @@ exports.run = (client, message, args) => {
                 onelineContestedSystems[11].cc += contestedSystems[i].cc;
             }
         }
+        contestedSystems.pop();
         for (let i = 0; i < onelineContestedSystems.length; i++) {
             if (onelineContestedSystems[i].power !== undefined && onelineContestedSystems[i].power !== power) {
                 contestedStr += `Contested with ${(onelineContestedSystems[i].power).split(' ')[0]}: ${onelineContestedSystems[i].cc}CC\n`;
@@ -385,10 +407,12 @@ exports.run = (client, message, args) => {
 
     // add back in control system
     const HQDistance = HQDistances(power, controlSphereSystem.x, controlSphereSystem.y, controlSphereSystem.z);
-    delete controlSphereSystem.x;
-    delete controlSphereSystem.y;
-    delete controlSphereSystem.z;
-    targetSystems.push(controlSphereSystem);
+    if (contestsMagic !== 1) {
+        delete controlSphereSystem.x;
+        delete controlSphereSystem.y;
+        delete controlSphereSystem.z;
+        targetSystems.push(controlSphereSystem);
+    }
 
     // math for cc calculations
     // Upkeep
@@ -464,7 +488,6 @@ exports.run = (client, message, args) => {
             break;
         }
     }
-
     // contests display adjustments
     if (contests === 1) {
         for (let i = 0; i < targetSystems.length; i++) {
@@ -514,7 +537,6 @@ exports.run = (client, message, args) => {
             targetSystems[i].power = `${contestPowerStrFirst}${contestPowerStrSecond}`;
         }
     }
-
     // warning addition
     let warningStr = '';
     if (warningFlag === 'Exploited') {
@@ -558,19 +580,19 @@ exports.run = (client, message, args) => {
     // header
     const header = `= ${sphere} ${sphereType} Sphere Analysis =\n${infoStart}${oppOrFortInfo}${infoEnd} ${HQDistance.toFixed(2)}ly from HQ\n${warningStr}\n`;
     // body
+    let i = 0;
+    let firstDisp = 20;
+    let secDisp = 25;
+    if (contests === 1) {
+        firstDisp = 15;
+        secDisp = 17;
+    }
     if (targetSystems.length === 0) {
         message.channel.send('`No systems found`');
-    } else if (targetSystems.length <= 20) {
+    } else if (targetSystems.length <= firstDisp) {
         const columns = columnify(targetSystems); // tabularize info
         message.channel.send(`\`\`\`asciidoc\n${header}${columns}\`\`\``);
     } else {
-        let i = 0;
-        let firstDisp = 20;
-        let secDisp = 25;
-        if (contests === 1) {
-            firstDisp = 10;
-            secDisp = 10;
-        }
         // print with header and first 20 systems
         for (; i < firstDisp; i++) {
             subSystems.push(targetSystems[i]);
@@ -604,6 +626,7 @@ exports.run = (client, message, args) => {
         overheadMaxStr = ` / ${netCCMax.toFixed(1)} at max overhead`;
     }
     const favorStr = `${favor} favorable/neutral/unfavorable systems for ${power}`;
+    console.log(grossCC)
     const grossStr = `Sphere gross value: ${grossCC + contestedCC}CC`;
     const upkeepOverheadStr = `Upkeep + Overhead: ${upkeep} + ${overheadStr}`;
     const netStr = `Net CC: ${netCC.toFixed(1)}CC${overheadMaxStr}`;
