@@ -206,7 +206,6 @@ exports.run = (client, message, args) => {
                 favor = `${favorables}/${neutrals}/${unfavorables}`;
                 // Gross CC
                 if (sphereType === 'Expansion' && (allSystems[i].power_state !== 'Exploited' && allSystems[i].power_state !== 'Control')) {
-                    console.log(allSystems[i].name)
                     grossCC += popToCC(allSystems[i].population);
                 }
                 if (sphereType === 'Control' && allSystems[i].power_state === 'Exploited') {
@@ -626,13 +625,13 @@ exports.run = (client, message, args) => {
         overheadMaxStr = ` / ${netCCMax.toFixed(1)} at max overhead`;
     }
     const favorStr = `${favor} favorable/neutral/unfavorable systems for ${power}`;
-    console.log(grossCC)
     const grossStr = `Sphere gross value: ${grossCC + contestedCC}CC`;
+    const grossMinusContestsStr = `Gross value not including contests: ${grossCC}CC`;
     const upkeepOverheadStr = `Upkeep + Overhead: ${upkeep} + ${overheadStr}`;
     const netStr = `Net CC: ${netCC.toFixed(1)}CC${overheadMaxStr}`;
     let powerChange = '';
     if (sphereType === 'Expansion') {
         powerChange = `${power} total CC change: ${(netCC - overheadEdge).toFixed(1)}`;
     }
-    message.channel.send(`\`\`\`\n${favorStr}\n${grossStr}\n${contestedStr}${upkeepOverheadStr}\n${netStr}\n${powerChange}\n\`\`\``);
+    message.channel.send(`\`\`\`\n${favorStr}\n${grossStr}\n${grossMinusContestsStr}\n${contestedStr}${upkeepOverheadStr}\n${netStr}\n${powerChange}\n\`\`\``);
 };
