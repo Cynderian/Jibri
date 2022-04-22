@@ -60,6 +60,7 @@ exports.run = (client, message, args) => {
     let warningFlag = '';
     let contestsMagic = 0;
     let expansionControlTrigger = 0;
+    let previouslyContestedCC = 0;
 
     // find input system's coords to use in distLessThan
     let sphereType = 'Expansion';
@@ -83,15 +84,15 @@ exports.run = (client, message, args) => {
             controlSphereSystem.power = allSystems[i].power;
             controlSphereSystem.state = allSystems[i].power_state;
 
-            if (allSystems[i].state === 'Control') {
-                grossCC += popToCC(allSystems[i].population);
-            }
-
             if (allSystems[i].power_state === 'Control') {
+                grossCC += popToCC(allSystems[i].population);
                 sphereType = 'Control';
             }
             if (allSystems[i].power_state === 'Expansion') {
                 warningFlag = 'Expansion';
+                if (allSystems[i].power === power) {
+                    grossCC += popToCC(allSystems[i].population);
+                }
             }
             if (allSystems[i].power_state === 'Exploited') {
                 warningFlag = 'Exploited';
@@ -205,10 +206,14 @@ exports.run = (client, message, args) => {
                 if (tmp === -1) { console.log('favorability error'); }
                 favor = `${favorables}/${neutrals}/${unfavorables}`;
                 // Gross CC
+                // Expansion
                 if (sphereType === 'Expansion' && (allSystems[i].power_state !== 'Exploited' && allSystems[i].power_state !== 'Control')) {
-                    console.log(allSystems[i].name)
                     grossCC += popToCC(allSystems[i].population);
                 }
+                if (sphereType === 'Expansion' && allSystems[i].power_state === 'Contested') {
+                    previouslyContestedCC += popToCC(allSystems[i].population);
+                }
+                // Control
                 if (sphereType === 'Control' && allSystems[i].power_state === 'Exploited') {
                     grossCC += popToCC(allSystems[i].population);
                 }
@@ -626,13 +631,13 @@ exports.run = (client, message, args) => {
         overheadMaxStr = ` / ${netCCMax.toFixed(1)} at max overhead`;
     }
     const favorStr = `${favor} favorable/neutral/unfavorable systems for ${power}`;
-    console.log(grossCC)
     const grossStr = `Sphere gross value: ${grossCC + contestedCC}CC`;
+    const grossMinusContestsStr = `Gross value not including contests: ${grossCC - previouslyContestedCC}CC`;
     const upkeepOverheadStr = `Upkeep + Overhead: ${upkeep} + ${overheadStr}`;
     const netStr = `Net CC: ${netCC.toFixed(1)}CC${overheadMaxStr}`;
     let powerChange = '';
     if (sphereType === 'Expansion') {
         powerChange = `${power} total CC change: ${(netCC - overheadEdge).toFixed(1)}`;
     }
-    message.channel.send(`\`\`\`\n${favorStr}\n${grossStr}\n${contestedStr}${upkeepOverheadStr}\n${netStr}\n${powerChange}\n\`\`\``);
+    message.channel.send(`\`\`\`\n${favorStr}\n${grossStr}\n${grossMinusContestsStr}\n${contestedStr}${upkeepOverheadStr}\n${netStr}\n${powerChange}\n\`\`\``);
 };

@@ -143,6 +143,7 @@ exports.run = (client, message, args) => {
             }
         }
     }
+    
     console.log('potential systems vetted for starports within <(distance)ls');
     // find 15ly sphere of all potential systems
     // add net and contested CC to threatSystem objects
@@ -222,7 +223,6 @@ exports.run = (client, message, args) => {
             threatSystems[i].Imperial = otherImperialCC;
         }
     }
-
     // reorganize and filter data
     for (let i = 0; i < threatSystems.length; i++) {
         delete threatSystems[i].x;
@@ -232,42 +232,33 @@ exports.run = (client, message, args) => {
         // threatSystems[i].intersect = intersectionString;
     }
 
+    // manual filters
     for (let i = 0; i < threatSystems.length; i++) {
-        if (threatSystems[i].Aisling <= 43) {
+        // contested AD cc
+        if (threatSystems[i].Aisling <= 10) {
             threatSystems.splice(i, 1);
             i -= 1;
         }
     }
-
+    // return all contested AD CC
+    for (let i = 0; i < threatSystems.length; i++) {
+        let tmp = 0;
+        let tmp2 = 0;
+        tmp = threatSystems[i].Aisling;
+        tmp2 = threatSystems[i].net_CC;
+        threatSystems[i].net_CC = tmp + tmp2;
+    }
 
     // sorts
     threatSystems.sort((a, b) => b.net_CC - a.net_CC); // sorts systems by net CC
     threatSystems.sort((a, b) => b.Aisling - a.Aisling); // sorts systems by contested CC
     threatSystems.sort((a, b) => a.trigger - b.trigger); // sorts systems trigger (ascending)
 
-    const columns = columnify(threatSystems); // tabularize info
-    // In case of >2000 character message overflow (basically guaranteed)
-    if (showAll === 1) {
-        let index = 0;
-        let i = 0;
-        while (columns.indexOf('\n', 1800 * (i + 1)) !== -1) {
-            const block = columns.substring(index, columns.indexOf('\n', 1800 * (i + 1)));
-            index = columns.indexOf('\n', 1900 * (i + 1));
-            message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
-            i++;
-        }
-    } else {
-        let index = 0;
-        for (let i = 0; i < 3; i++) {
-            const block = columns.substring(index, columns.indexOf('\n', 1800 * (i + 1)));
-            index = columns.indexOf('\n', 1900 * (i + 1));
-            message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
-        }
-    }
-
     // write to txt
+    const columns = columnify(threatSystems); // tabularize info
     fs.writeFile('./data/weapons.txt', columns, (err) => {
         if (err) return console.log(err);
+        message.channel.send('file saved!');
         console.log('file successfully saved');
     });
 };
