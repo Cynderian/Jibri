@@ -632,7 +632,11 @@ exports.run = (client, message, args) => {
     }
     const favorStr = `${favor} favorable/neutral/unfavorable systems for ${power}`;
     const grossStr = `Sphere gross value: ${grossCC + contestedCC}CC`;
+<<<<<<< HEAD
     const grossMinusContestsStr = `Gross value not including contests: ${grossCC - previouslyContestedCC}CC`;
+=======
+    const grossMinusContestsStr = `Gross value not including contests: ${grossCC}CC`;
+>>>>>>> 1b159fade4ac31746f6326649847c850f3c72154
     const upkeepOverheadStr = `Upkeep + Overhead: ${upkeep} + ${overheadStr}`;
     const netStr = `Net CC: ${netCC.toFixed(1)}CC${overheadMaxStr}`;
     let powerChange = '';
