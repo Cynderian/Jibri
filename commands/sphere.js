@@ -59,13 +59,13 @@ exports.run = (client, message, args) => {
     let favor = '';
     let warningFlag = '';
     let contestsMagic = 0;
-    let expansionControlTrigger = 0;
+    //let expansionControlTrigger = 0;
     let previouslyContestedCC = 0;
 
     // find input system's coords to use in distLessThan
     let sphereType = 'Expansion';
     const controlSphereSystem = {};
-    // central system to base sphere off of
+    // central system to base sphere off of (control system)
     for (let i = 0; i < allSystems.length; i++) {
         if (sphere === (allSystems[i].name).toLowerCase()) {
             sphere = allSystems[i].name;
@@ -84,6 +84,14 @@ exports.run = (client, message, args) => {
             controlSphereSystem.power = allSystems[i].power;
             controlSphereSystem.state = allSystems[i].power_state;
 
+            if ((allSystems[i].power_state === 'Control' || allSystems[i].power_state === 'Expansion')
+            && override === 0) {
+                power = allSystems[i].power;
+            }
+            if (override === 1) {
+                sphereType = 'Expansion';
+                controlSphereSystem.power_state = null;
+            }
             if (allSystems[i].power_state === 'Control') {
                 grossCC += popToCC(allSystems[i].population);
                 sphereType = 'Control';
@@ -92,18 +100,12 @@ exports.run = (client, message, args) => {
                 warningFlag = 'Expansion';
                 if (allSystems[i].power === power) {
                     grossCC += popToCC(allSystems[i].population);
+                } else {
+                    contestedCC += popToCC(allSystems[i].population);
                 }
             }
             if (allSystems[i].power_state === 'Exploited') {
                 warningFlag = 'Exploited';
-            }
-            if ((allSystems[i].power_state === 'Control' || allSystems[i].power_state === 'Expansion')
-            && override === 0) {
-                power = allSystems[i].power;
-            }
-            if (override === 1) {
-                sphereType = 'Expansion';
-                controlSphereSystem.power_state = null;
             }
             break;
         }
@@ -246,11 +248,13 @@ exports.run = (client, message, args) => {
                     const system2 = {};
                     system2.power = allSystems[i].power;
                     system2.cc = popToCC(allSystems[i].population);
-                    contestedCC += popToCC(allSystems[i].population);
-                    if (expansionControlTrigger === 0) {
+                    if (sphere !== allSystems[i].name) {
+                        contestedCC += popToCC(allSystems[i].population);
+                    }
+                    /*if (expansionControlTrigger === 0) { // What is this code block for lol
                         contestedCC += controlSphereSystem.cc;
                         expansionControlTrigger = 1;
-                    }
+                    }*/
                     contestedSystems.push(system2);
                 }
             }
@@ -293,16 +297,28 @@ exports.run = (client, message, args) => {
         });
 
         // total contested CC counts
+        let tmp = [];
         for (let i = 0; i < detailedContestedSystems.length; i++) {
+            let tmp2 = 0;
             if (detailedContestedSystems[i].power !== controlSphereSystem.power) {
-                otherContestedCC += detailedContestedSystems[i].cc;
+                for (let j = 0; j < tmp.length; j++) {
+                    if (tmp[j] === detailedContestedSystems[i].name) {
+                        tmp2 = 1;
+                    }
+                }
+                if (tmp2 === 0) {
+                    otherContestedCC += detailedContestedSystems[i].cc;
+                    tmp.push(detailedContestedSystems[i].name);
+                }
             }
         }
+        tmp = [];
         for (let i = 0; i < detailedContestedSystems.length; i++) {
             if (detailedContestedSystems[i].power === controlSphereSystem.power) {
                 selfContestedCC += detailedContestedSystems[i].cc;
             }
         }
+        tmp = [];
         contestedStr = `Contested CC with other powers: ${otherContestedCC}CC\nSelf-contested CC: ${selfContestedCC}CC\n`;
         for (let i = 0; i < 12; i++) { // 12 = number of powers + 1
             const system = {};
