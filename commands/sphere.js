@@ -67,7 +67,8 @@ exports.run = (client, message, args) => {
     const controlSphereSystem = {};
     // central system to base sphere off of (control system)
     for (let i = 0; i < allSystems.length; i++) {
-        if (sphere === (allSystems[i].name).toLowerCase()) {
+        if (sphere === (allSystems[i].name).toLowerCase()
+        && allSystems[i].population > 0) {
             sphere = allSystems[i].name;
 
             // add to control data object to insert later
