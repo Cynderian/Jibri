@@ -309,12 +309,15 @@ function mirrorEddb() {
     const urlOne = 'https://eddb.io/archive/v6/systems_populated.json';
     const urlTwo = 'https://eddb.io/archive/v6/stations.json';
     // save file as data for day before
-    const pathOne = `./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`;
-    const pathTwo = './data/stations.json';
+    const pathOne = './data/systems_raw.json';
+    const pathTwo = './data/stations_raw.json';
+    // const pathOne = `./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`;
+    // const pathTwo = './data/stations.json';
     exec('mkdir data');
     download(urlOne, pathOne, () => {
         const now = new Date();
         console.log(`EDDB populated systems json mirrored at ${now}`);
+        popSystemsFilter();
     });
     download(urlTwo, pathTwo, () => {
         const now = new Date();
@@ -340,62 +343,91 @@ function removeQuotes(input) {
     return input;
 }
 
+async function popSystemsFilter() {
+    const today = new Date();
+    // find systems in EDDB
+    let data = fs.readFileSync('./data/systems_raw.json', 'utf8');
+    let allSystems = JSON.parse(data);
+    data = undefined;
+    // initialize and clear file
+    fs.writeFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, '[');
+    // append to file
+    for (let i = 0; i < allSystems.length; i++) {
+        let content = `{"id":${allSystems[i].id},\
+"name":"${allSystems[i].name}",\
+"x":${allSystems[i].x},\
+"y":${allSystems[i].y},\
+"z":${allSystems[i].z},\
+"population":${allSystems[i].population},\
+"government":"${allSystems[i].government}",\
+"states":[`;
+        for (let j = 0; j < (allSystems[i].states).length; j++) {
+            content += `{"name":"${allSystems[i].states[j].name}"}`;
+            if (j !== (allSystems[i].states).length - 1) {
+                content += ',';
+            }
+        }
+        content += `],`;
+        content += (allSystems[i].power === null) ? `"power":null,`:`"power":"${allSystems[i].power}",`;
+        content += (allSystems[i].power_state === null) ? `"power_state":null,`:`"power_state":"${allSystems[i].power_state}",`;
+        content += `"updated_at":${allSystems[i].updated_at},\
+"minor_factions_updated_at":${allSystems[i].minor_factions_updated_at},\
+"controlling_minor_faction_id":${allSystems[i].controlling_minor_faction_id},\
+"controlling_minor_faction":"${allSystems[i].controlling_minor_faction}",\
+"minor_faction_presences":[`;
+        for (let j = 0; j < (allSystems[i].minor_faction_presences).length; j++) {
+            content += `{"minor_faction_id":${allSystems[i].minor_faction_presences[j].minor_faction_id},"influence":${allSystems[i].minor_faction_presences[j].influence}}`;
+            if (j !== (allSystems[i].minor_faction_presences).length - 1) {
+                content += ',';
+            }
+        }
+        content += `]}`
+
+        if (i !== (allSystems).length - 1) {
+            content += ',';
+        } else {
+            content += ']'
+        }
+        fs.appendFile(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, content, err=> {
+            if (err) {
+                console.error(err);
+            }
+        });
+    }
+    console.log("Filtered system data complete")
+}
 async function objectivesStationsFilter() {
     const today = new Date();
     const jsonStream = StreamArray.withParser();
-
-    // find system in EDDB
-    let data = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
-    let allSystems = JSON.parse(data);
-    data = undefined;
-    
-    // grab all friendly power control systems
-    const input = 'Aisling Duval';
-    const controlSystems = [];
-    for (let i = 0; i < allSystems.length; i++) {
-        if (allSystems[i].power === input && allSystems[i].power_state === 'Control') {
-            const controlSystem = {};
-            controlSystem.x = allSystems[i].x;
-            controlSystem.y = allSystems[i].y;
-            controlSystem.z = allSystems[i].z;
-            controlSystems.push(controlSystem);
-        }
-    }
-
-    // delete file if exists
-    if (fs.existsSync('./data/objectives_stations.json')) {
-        fs.unlinkSync('./data/objectives_stations.json');
-    }
-    
+    let sep = '';
+    // initialize and clear file
+    fs.writeFileSync('./data/stations.json', '[');
     // loop through stations
-    fs.createReadStream('./data/stations.json').pipe(jsonStream.input);
+    fs.createReadStream('./data/stations_raw.json').pipe(jsonStream.input);
     jsonStream.on('data', ({key, value}) => {
-        for (let i = 0; i < allSystems.length; i++) {
-            let ADSystem = 0;
-            if (allSystems[i].id === value.system_id) {
-                for (let j = 0; j < controlSystems.length; j++) {
-                    // 45 to include all potential weapons
-                    if (distLessThan(45, allSystems[i].x, allSystems[i].y, allSystems[i].z, controlSystems[j].x, controlSystems[j].y, controlSystems[j].z)) {
-                        ADSystem = 1;
-                    }
-                }
-                if (ADSystem === 1) {
-                    let station = `{"name":"${value.name}","system_id":${value.system_id},"max_landing_pad_size":"${value.max_landing_pad_size}","distance_to_star":${value.distance_to_star},"type":"${value.type}","is_planetary":${value.is_planetary},"controlling_minor_faction_id":${value.controlling_minor_faction_id}}`;
-                    fs.appendFile('./data/objectives_stations.json', station, err => {
-                        if (err) {
-                            console.error(err);
-                            return;
-                        }
-                    });
-                }
-                break;
+        // append to file
+        let content = `${sep}\
+{"id":${value.id},\
+"name":"${value.name}",\
+"system_id":${value.system_id},\
+"updated_at":${value.updated_at},\
+"max_landing_pad_size":"${value.max_landing_pad_size}",\
+"distance_to_star":${value.distance_to_star},\
+"government":"${value.government}",\
+"type":"${value.type}",\
+"is_planetary":${value.is_planetary},\
+"controlling_minor_faction_id":${value.controlling_minor_faction_id}}`;
+        fs.appendFile(`./data/stations.json`, content, err=> {
+            if (err) {
+                console.error(err);
             }
-        }
+        });
+        sep = ',';
     });
     jsonStream.on('end', () => {
-        console.log('objectivesStationFilter complete!');
+        fs.appendFileSync('./data/stations.json', ']');
+        console.log('Filtered station data complete');
     });
-    console.log('objectivesStationFilter complete!');
 }
 
 module.exports = { inputPowerFilter, HQDistances, favorability, getURL, infLead, capitalize, popToCC, distLessThan, lastUpdated, mirrorEddb, removeQuotes, objectivesStationsFilter };
