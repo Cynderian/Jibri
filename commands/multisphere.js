@@ -1,5 +1,5 @@
 exports.run = (client, message, args) => {
-    console.log('working on multisphere');
+    /*console.log('working on multisphere');
     message.channel.send('Calculating...');
     let input = '';
     const inputs = [];
@@ -26,5 +26,5 @@ exports.run = (client, message, args) => {
     if (inputs.length <= 1) { // if one/none system
         message.channel.send('This command requires at least 2 input systems');
         return;
-    }
+    }*/
 };
