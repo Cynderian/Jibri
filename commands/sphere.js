@@ -140,10 +140,9 @@ exports.run = (client, message, args) => {
                 // filter out control system
                 if (sphere === allSystems[i].name) {
                     // contests modification
-                    if (contests !== 1 || controlSphereSystem.state === 'Control' || controlSphereSystem.power === power) {
-                        continue;
+                    if (contests === 1 || controlSphereSystem.state !== 'Control' || controlSphereSystem.power !== power) {
+                        contestsMagic = 1;
                     }
-                    contestsMagic = 1;
                 }
                 const lastTick = lastUpdated(allSystems[i].minor_factions_updated_at * 1000); // convert from unix timestamp
 
@@ -212,6 +211,7 @@ exports.run = (client, message, args) => {
                 // Expansion
                 if (sphereType === 'Expansion' && (allSystems[i].power_state !== 'Exploited' && allSystems[i].power_state !== 'Control')) {
                     grossCC += popToCC(allSystems[i].population);
+                    console.log(grossCC)
                 }
                 if (sphereType === 'Expansion' && allSystems[i].power_state === 'Contested') {
                     previouslyContestedCC += popToCC(allSystems[i].population);
