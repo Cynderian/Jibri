@@ -10,5 +10,5 @@ exports.run = (client, message) => {
     const cc = '\t~cc <power> shows the total cc and systems controlled and exploited by a power. Good for confirming if database has been updated.\n';
     const objectives = '\t~objectives <system 1>, <system 2>, ...<system n> to create a copy-pastable list of objectives, **only works on maitenance targets**.';
     const postamble = 'The dates shown reflect when the leads were last updated, and are *roughly* autocorrected to the last tick time (faulty since EDO). Data is pulled from EDDB daily at 1am CST\n';
-    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${sphere}\n${multisphere}\n${scout}\n${faction}\n${profitables}\n${cc}\n${objectives}\n ${postamble}\n\`\`\``);
+    message.channel.send(`\`\`\`\n${version}\n ${preamble}Commands:\n${sphere}\n${scout}\n${faction}\n${cc}\n${objectives}\n ${postamble}\n\`\`\``);
 };
