@@ -113,7 +113,9 @@ exports.run = (client, message, args) => {
     }
     // exit if system does not exist
     if (controlSphereSystem.x === undefined) {
-        console.log('command aborted');
+        console.log('command aborted. args:');
+        console.log(args)
+        console.log(sphere)
         return message.channel.send('Something went wrong; was there a typo?');
     }
     if (sphereType === 'Expansion' && noInputPowerFlag === 1) {
