@@ -195,23 +195,24 @@ exports.run = (client, message, args) => {
                 }
                 // footer data
                 // Favorable / Neutral / Unfavorable
-                const tmp = favorability(power, allSystems[i].government, allSystems[i].power_state, allSystems[i].power, sphereType);
-                if (tmp === 'favorable') {
-                    favorables += 1;
+                if (allSystems[i].name !== sphere) { // not target sphere system
+                    const tmp = favorability(power, allSystems[i].government, allSystems[i].power_state, allSystems[i].power, sphereType);
+                    if (tmp === 'favorable') {
+                        favorables += 1;
+                    }
+                    if (tmp === 'unfavorable') {
+                        unfavorables += 1;
+                    }
+                    if (tmp === 'neutral') {
+                        neutrals += 1;
+                    }
+                    if (tmp === -1) { console.log('favorability error'); }
+                    favor = `${favorables}/${neutrals}/${unfavorables}`;
                 }
-                if (tmp === 'unfavorable') {
-                    unfavorables += 1;
-                }
-                if (tmp === 'neutral') {
-                    neutrals += 1;
-                }
-                if (tmp === -1) { console.log('favorability error'); }
-                favor = `${favorables}/${neutrals}/${unfavorables}`;
                 // Gross CC
                 // Expansion
                 if (sphereType === 'Expansion' && (allSystems[i].power_state !== 'Exploited' && allSystems[i].power_state !== 'Control')) {
                     grossCC += popToCC(allSystems[i].population);
-                    console.log(grossCC)
                 }
                 if (sphereType === 'Expansion' && allSystems[i].power_state === 'Contested') {
                     previouslyContestedCC += popToCC(allSystems[i].population);
