@@ -73,7 +73,7 @@ exports.run = (client, message, args) => {
         // filter out spheres
         
         if (allSystems[i].power_state === 'Control') {
-            if (allSystems[i].name === 'LTT1289'
+            if (allSystems[i].name === 'LTT 1289'
             || allSystems[i].name === 'Gabjaujis'
             || allSystems[i].name === 'Kaukamal'
             || allSystems[i].name === 'Qi Yun Cech'
