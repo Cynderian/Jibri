@@ -5,6 +5,7 @@ const { mirrorEddb} = require('./functions');
 const client = new Discord.Client();
 client.config = config;
 
+global.downloadsFlag = 0;
 mirrorEddb();
 
 fs.readdir('./events/', (err, files) => {

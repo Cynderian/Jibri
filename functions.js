@@ -308,32 +308,35 @@ function mirrorEddb() {
 
     const urlOne = 'https://eddb.io/archive/v6/systems_populated.json';
     const urlTwo = 'https://eddb.io/archive/v6/stations.json';
-    // save file as data for day before
     const pathOne = './data/systems_raw.json';
     const pathTwo = './data/stations_raw.json';
-    // const pathOne = `./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`;
-    // const pathTwo = './data/stations.json';
+    let systemsFlag = 0;
+    let stationsFlag = 0;
+
     exec('mkdir data');
     download(urlOne, pathOne, () => {
         const now = new Date();
         console.log(`EDDB populated systems json mirrored at ${now}`);
         popSystemsFilter();
+        if (systemsFlag === 1 && stationsFlag === 1) {
+            downloadCompleted();
+        }
+        systemsFlag = 1;
     });
     download(urlTwo, pathTwo, () => {
         const now = new Date();
         console.log(`EDDB station json mirrored at ${now}`);
         objectivesStationsFilter();
+        if (systemsFlag === 1 && stationsFlag === 1) {
+            downloadCompleted();
+        }
+        stationsFlag = 1;
     });
-    let oldData = new Date();
-    oldData = oldData.setDate(today.getDate() - 6); // find 6 days prior in ms
-    oldData = new Date(oldData); // convert ms to Date object
-    const oldJSON = `./data/systems_populated_${oldData.getMonth() + 1}_${oldData.getDate()}_${oldData.getFullYear()}.json`;
-    fs.stat(oldJSON, (err) => { // check if old data exists
-        if (err) return;
-        fs.unlink(oldJSON, () => { // delete old data
-            console.log('file deleted successfully');
-        });
-    });
+}
+
+function downloadCompleted() {
+    downloadsFlag = 1
+    console.log("All data is updated!")
 }
 
 function removeQuotes(input) {
@@ -388,7 +391,7 @@ async function popSystemsFilter() {
         } else {
             content += ']'
         }
-        fs.appendFile(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, content, err=> {
+        fs.appendFile(`./data/systems_populated`, content, err=> {
             if (err) {
                 console.error(err);
             }

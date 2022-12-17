@@ -14,6 +14,16 @@ module.exports = (client, message) => {
     console.log(trackedCommandStr);
     // command handling
     const cmd = client.commands.get(command);
-    if (!cmd) return console.log('whah - unknown command');
-    cmd.run(client, message, args);
+    if (!cmd) return console.log('unknown command');
+    // files downloading check
+    if (downloadsFlag === 1) {
+        try {
+            cmd.run(client, message, args);
+        }
+        catch (e) {
+            console.log(`Error caught:\n${e}`);
+        }
+    } else {
+        message.channel.send('Error- Jibri is currently updating its local database. Please try again in a few minutes.');
+    }
 };
