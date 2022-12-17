@@ -318,7 +318,7 @@ function mirrorEddb() {
         const now = new Date();
         console.log(`EDDB populated systems json mirrored at ${now}`);
         popSystemsFilter();
-        if (systemsFlag === 1 && stationsFlag === 1) {
+        if (stationsFlag === 1) {
             downloadCompleted();
         }
         systemsFlag = 1;
@@ -327,7 +327,7 @@ function mirrorEddb() {
         const now = new Date();
         console.log(`EDDB station json mirrored at ${now}`);
         objectivesStationsFilter();
-        if (systemsFlag === 1 && stationsFlag === 1) {
+        if (systemsFlag === 1) {
             downloadCompleted();
         }
         stationsFlag = 1;
@@ -353,7 +353,7 @@ async function popSystemsFilter() {
     let allSystems = JSON.parse(data);
     data = undefined;
     // initialize and clear file
-    fs.writeFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, '[');
+    fs.writeFileSync(`./data/systems_populated.json`, '[');
     // append to file
     for (let i = 0; i < allSystems.length; i++) {
         let content = `{"id":${allSystems[i].id},\
@@ -391,7 +391,7 @@ async function popSystemsFilter() {
         } else {
             content += ']'
         }
-        fs.appendFile(`./data/systems_populated`, content, err=> {
+        fs.appendFile(`./data/systems_populated.json`, content, err=> {
             if (err) {
                 console.error(err);
             }

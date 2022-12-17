@@ -26,7 +26,7 @@ exports.run = (client, message, args) => {
         }
     }
     // find system in EDDB
-    let data = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
+    let data = fs.readFileSync(`./data/systems_populated.json`, 'utf8');
     let allSystems = JSON.parse(data);
     data = undefined;
 

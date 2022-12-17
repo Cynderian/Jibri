@@ -57,7 +57,7 @@ exports.run = (client, message, args) => {
     const controlSystems = [];
     const allSystems = [];
     let threatControlSystems = 0;
-    let obj = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
+    let obj = fs.readFileSync(`./data/systems_populated.json`, 'utf8');
     const refSys = JSON.parse(obj);
     // grab all friendly power control systems
     for (let i = 0; i < refSys.length; i++) {

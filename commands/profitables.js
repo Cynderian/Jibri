@@ -32,7 +32,7 @@ exports.run = (client, message, args) => {
     if (power === undefined) {
         return message.channel.send('Error reading power name, please try again');
     }
-    let obj = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
+    let obj = fs.readFileSync(`./data/systems_populated.json`, 'utf8');
     const allSystems = JSON.parse(obj);
 
     obj = fs.readFileSync('./data/stations.json', 'utf8');    

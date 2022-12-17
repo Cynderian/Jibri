@@ -20,7 +20,7 @@ exports.run = (client, message, args) => {
     targetFaction += ` ${(args[args.length - 1]).slice(0, -1)}`;// last arg
 
     const targetSystems = [];
-    const data = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
+    const data = fs.readFileSync(`./data/systems_populated.json`, 'utf8');
     const obj = JSON.parse(data);
     for (let i = 0; i < obj.length; i++) {
         if (obj[i].controlling_minor_faction === targetFaction) {

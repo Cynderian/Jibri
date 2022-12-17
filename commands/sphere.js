@@ -43,7 +43,7 @@ exports.run = (client, message, args) => {
     }
     // correct potential formatting errors
     sphere = (removeQuotes(sphere)).toLowerCase();
-    const data = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
+    const data = fs.readFileSync(`./data/systems_populated.json`, 'utf8');
     const allSystems = JSON.parse(data);
 
     // variable declarations

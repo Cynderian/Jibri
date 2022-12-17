@@ -25,7 +25,7 @@ exports.run = (client, message, args) => {
     let control = 0;
     // grab all control systems for the power
     const today = new Date();
-    const obj = fs.readFileSync(`./data/systems_populated_${today.getMonth() + 1}_${today.getDate()}_${today.getFullYear()}.json`, 'utf8');
+    const obj = fs.readFileSync(`./data/systems_populated.json`, 'utf8');
     const allSystems = JSON.parse(obj);
 
     for (let i = 0; i < allSystems.length; i++) {
