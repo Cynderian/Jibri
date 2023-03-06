@@ -1,4 +1,5 @@
 const fs = require('fs');
+
 module.exports = (client, message) => {
     // ignore non-prefix and bot messages
     if (!message.content.startsWith(client.config.prefix) || message.author.bot) return;
@@ -21,7 +22,8 @@ module.exports = (client, message) => {
             cmd.run(client, message, args);
         }
         catch (e) {
-            console.log(`Error caught:\n${e}`);
+            console.log(`Error caught: ${e}\nDetails:`);
+            console.log(e);
         }
     } else {
         message.channel.send('Error- Jibri is currently updating its local database. Please try again in a few minutes.');
