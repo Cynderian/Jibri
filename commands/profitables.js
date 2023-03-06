@@ -58,7 +58,7 @@ exports.run = (client, message, args) => {
             || allSystems[i].name === 'Tumuzgo'
             || allSystems[i].name === 'Munshin') {
                 // within 15 ly
-                if (distLessThan(15, allSystems.x, allSystems.y, allS))
+                if (distLessThan(15, allSystems.x, allSystems.y, allSystems.z))
                 toFilter.push(allSystems.name);
             }
         }
