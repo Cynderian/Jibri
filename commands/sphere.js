@@ -197,7 +197,8 @@ exports.run = (client, message, args) => {
                 }
                 // footer data
                 // Favorable / Neutral / Unfavorable
-                if (allSystems[i].name !== sphere) { // not target sphere system
+                if (allSystems[i].name !== sphere // not target sphere system
+                    && ((allSystems[i].power === power || allSystems[i].power === null) || override === 1)) { // only collision systems are checked
                     const tmp = favorability(power, allSystems[i].government, allSystems[i].power_state, allSystems[i].power, sphereType);
                     if (tmp === 'favorable') {
                         favorables += 1;
@@ -640,6 +641,11 @@ exports.run = (client, message, args) => {
             block = columnify(subSystems);
             message.channel.send(`\`\`\`asciidoc\n${block}\n\`\`\``);
         }
+    }
+
+    // Correction for no systems found
+    if (favor === '') {
+        favor = '0/0/0'
     }
 
     // footer
