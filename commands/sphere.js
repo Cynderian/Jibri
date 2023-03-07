@@ -577,7 +577,7 @@ exports.run = (client, message, args) => {
         if (favorables > neutrals && favorables > unfavorables) {
             oppOrFortInfo = `= ${fort} to fortify =`;
         } else if (unfavorables > neutrals && unfavorables > favorables) {
-            oppOrFortInfo = `[${fort} to fortify]`;
+            oppOrFortInfo = `${fort} to fortify::`;
         } else {
             oppOrFortInfo = `| ${fort} to fortify |`;
         }
@@ -589,8 +589,8 @@ exports.run = (client, message, args) => {
             infoStart = '= ';
             infoEnd = ' (favorable) =';
         } else if (unfavorables > neutrals && unfavorables > favorables) {
-            infoStart = '[';
-            infoEnd = ']';
+            infoStart = '';
+            infoEnd = '::';
         } else {
             infoStart = '| ';
             infoEnd = ' |';
